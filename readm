@@ -1,3 +1,28 @@
-## Тесты
+let
+	threshold = 2,
+	totalRunning = 0,
+	urls = ['/h2', '/h1', '/h3', '/h4'];
 
-Для решил попробовать [QUnit](https://qunitjs.com). Тесты расположены в папке [test](https://github.com/Dischain/jc/tree/master/test). Просто запустите [index.html](https://github.com/Dischain/jc/blob/master/test/index.html),
+function aq() {
+
+	/*complete = false,
+	curTask = -1,*/
+	console.log('totalRunning: ' + totalRunning);
+	while (totalRunning < threshold && urls.length > 0) {
+		let url = urls.shift();
+		console.log(url);
+		fetch(url).then((resp) => {
+			console.log(resp.text())
+			totalRunning--;
+			if (urls.length > 0) {
+				aq();
+			} else if (totalRunning === 0) {
+				console.log('done');
+			}
+		});
+
+		totalRunning++;
+	}
+}
+
+aq();
