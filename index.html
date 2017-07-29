@@ -1,19 +1,184 @@
 <!doctype html>
 <html>
-<head>
-    <title>QUnit Jc Test Suite</title>
-    <link rel="stylesheet" href="http://github.com/jquery/qunit/raw/master/qunit/qunit.css">
-    <link rel="stylesheet" href="./css/style.css">
-</head>
-<body>
-    <h1 id="qunit-header">QUnit Test Suite</h1>
-    <h2 id="qunit-banner"></h2>
-    <div id="qunit-testrunner-toolbar"></div>
-    <h2 id="qunit-userAgent"></h2>
-    <ol id="qunit-tests"></ol>
-
-    <script src="./js/qunit-2.3.3.js"></script>
-    <script src="./js/jc.js"></script>
-    <script src="./js/test.js"></script>
-</body>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE-edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+        <title>Резюме / Александр Шайтанов</title>
+        <link rel="stylesheet" href="./css/style.css">
+    </head>
+    <body>
+        <div class="main-hold clearfix">
+            <div class="left-container clearfix">
+                <ul class="side-bar">
+                    <li class="side-bar__header">
+                        <a href="#" class="author">
+                            <div class="author__avatar"></div>
+                            <div class="author__info">
+                                <span>Александр Шайтанов</span>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="side-bar__item side-bar__item_active">
+                        <a href="#anchor_about"><span>Обо мне</span></a>
+                    </li>
+                    <li class="side-bar__item">
+                        <a href="#anchor_skills"><span>Навыки</span></a>
+                    </li>
+                    <li class="side-bar__item">
+                        <a href="#anchor_exp"><span>Опыт</span></a>
+                    </li>
+                    <li class="side-bar__item">
+                        <a href="#anchor_working"><span>Деятельность</span></a>
+                    </li>
+                    <li class="side-bar__item">
+                        <a href="#anchor_contacts"><span>Контакты</span></a>
+                    </li>
+                </ul>
+                <div class="social-links">
+                    <a class="social-links__service social-links__service_type-vk" href="https://vk.com/lastgunslinger" target="_blank"></a>
+                    <a class="social-links__service social-links__service_type-yandex" href="mailto:rdischain@yandex.ru" target="_blank"></a>
+                    <a class="social-links__service social-links__service_type-github" href="https://github.com/Dischain" target="_blank"></a>
+                </div>
+            </div>
+            <div class="content">
+                <div class="article">
+                    <h1 class="article__heading article__heading_h1">Node.js developer</h1>
+                    <h2 class="article__heading article__heading_h2" id="anchor_about">Обо мне</h2>                    
+                        <dl class="desc-list">
+                            <div class="desc-list__item desc-list__item_margin-large">
+                                <dt class="desc-list__title inline-block">Полное имя:</dt>
+                                <dd class="desc-list__definition inline-block">Шайтанов Александр Игоревич</dd>
+                            </div>
+                            <div class="desc-list__item desc-list__item_margin-large">
+                                <dt class="desc-list__title inline-block">Год рождения:</dt>
+                                <dd class="desc-list__definition inline-block">27 ноября 1991</dd>
+                            </div>
+                            <div class="desc-list__item desc-list__item_margin-large">
+                                <dt class="desc-list__title inline-block">Место проживания:</dt>
+                                <dd class="desc-list__definition inline-block">Симферополь</dd>
+                            </div>
+                            <div class="desc-list__item desc-list__item_margin-large">
+                                <dt class="desc-list__title inline-block">Образование:</dt>
+                                <dd class="desc-list__definition inline-block">НАПКС, Промышленное и гражданское строительство, магистр (2014)</dd>
+                            </div>
+                            <div class="desc-list__item desc-list__item_margin-large">
+                                <dt class="desc-list__title inline-block">Опыт программирования:</dt>
+                                <dd class="desc-list__definition inline-block">2 года 2 месяца</dd>
+                            </div>
+                        </dl>
+                                               
+                    <h2 class="article__heading article__heading_h2" id="anchor_skills">Навыки</h2>
+                    <h3 class="article__heading article__heading_h3">Ключевые навыки:</h3>                    
+                    <dl class="desc-list">
+                        <div class="desc-list__item desc-list__item_margin-large">
+                            <dt class="desc-list__title inline-block">Языки программирования:</dt>                            
+                            <dd class="desc-list__definition inline-block">JavaScript (Node.js, DOM, ES6)</dd>
+                        </div>
+                        <div class="desc-list__item desc-list__item_margin-large">
+                            <dt class="desc-list__title inline-block">Библиотеки, фреймворки, технологии:</dt>
+                            <dd class="desc-list__definition inline-block">Express, Mongoose, небольшой опыт работы с React, Redux</dd>
+                        </div>
+                        <div class="desc-list__item desc-list__item_margin-large">
+                            <dt class="desc-list__title inline-block">Базы данных:</dt>
+                            <dd class="desc-list__definition inline-block">MySQL, SQLite, MongoDB, Redis</dd>
+                        </div>
+                        <div class="desc-list__item desc-list__item_margin-large">
+                            <dt class="desc-list__title inline-block">VCS:</dt>
+                            <dd class="desc-list__definition inline-block">Git</dd>
+                        </div>
+                        <div class="desc-list__item desc-list__item_margin-large">
+                            <dt class="desc-list__title">Также разбираюсь:</dt>
+                            <dd class="desc-list__definition">Linux (Ubuntu), есть небольшой опыт Shell-скриптинга, модель OSI, TCP/IP, алгоритмы и структуры данных, интересуюсь функциональным прогаммированием, HTML, CSS, jQuery, Mocha, Chai, QUnit. <br>Так же есть опыт работы в большой команде инженеров - 30-40 человек.</dd>
+                        </div>
+                        <div class="desc-list__item desc-list__item_margin-large">
+                            <dt class="desc-list__title inline-block">Языки:</dt>
+                            <dd class="desc-list__definition inline-block">Английский (Технический)</dd>
+                        </div>
+                    </dl>
+                    <h3 class="article__heading article__heading_h3">Прочие навыки:</h3>
+                    <dl class="desc-list">
+                        <div class="desc-list__item desc-list__item_margin-large">
+                            <dt class="desc-list__title inline-block">Языки программирования, библиотеки, фреймворки:</dt>                            
+                            <dd class="desc-list__definition inline-block">Java, Lisp, C++, STL, JavaFX, ApachePOI, Maven, SFML</dd>
+                        </div>
+                    </dl>
+                    <h2 class="article__heading article__heading_h2" id="anchor_exp">Опыт</h2>
+                    <h3 class="article__heading article__heading_h3">Основное:</h3>
+                    <dl class="desc-list">
+                        <div class="desc-list__item_margin-large">
+                            <dt class="desc-list__title"><a href="https://github.com/Dischain/nora.js" target="_blank">nora.js</a></dt>
+                            <dd class="desc-list__definition">Utility-модуль для работы с асинхронным javascript. Предоставляет очередь с приоритетами и обычную очередь для хранения асинхронных тасков, которые позволяют выбрать один из алгоритмов выполнения - <code>parallel, prallel limited, series</code>, и вызывают заданный <code>callback</code> после завершения. Написан на чистом Node.js. Примеры и краткая документация доступны на <a href="https://github.com/Dischain/nora.js" target="_blank">github</a></dd>
+                        </div>
+                        <div class="desc-list__item_margin-large">
+                            <dt class="desc-list__title"><a href="https://github.com/Dischain/skb" target="_blank">skb</a></dt>
+                            <dd class="desc-list__definition">RESTful API базы знаний. Используется express, mongo, redis, cluster. Позволяет строить рекурсивно вложенную структуру каталогов, создавать статьи, аттачить каталоги других пользователей со всем вложенным содержимым, в том числе и рекурсивно вложенные каталоги. Разработка в процессе.</dd>
+                        </div>
+                        <div class="desc-list__item_margin-large">
+                            <dt class="desc-list__title"><a href="https://github.com/Dischain/cli-postman" target="_blank">cli-postman</a></dt>
+                            <dd class="desc-list__definition">Консольное приложение для отправки почты. Использует в своей основе <a href="https://github.com/nodemailer/nodemailer">nodemailer</a> и <a href="https://github.com/mapbox/node-sqlite3">sqlite3</a> для хранения отправленных писем. Написан на Node.js, <a href="https://en.wikipedia.org/wiki/Just_for_Fun">just for fun :)</a></dd>
+                        </div>
+                        <div class="desc-list__item_margin-large">
+                            <dt class="desc-list__title"><a href="https://github.com/Dischain/alc" target="_blank">alc</a></dt>
+                            <dd class="desc-list__definition">Асинхронный рекурсивный счетчик строк в каталоге, использующий в своей основе Promises и работающий из командной строки. Может распечатывать результаты в <a href="https://github.com/Dischain/yet-another-ascii-table" target="_blank">ASCII-таблицу</a>. Написан на Node.js.</dd>
+                        </div>
+                        <div class="desc-list__item_margin-large">
+                            <dt class="desc-list__title"><a href="https://github.com/Dischain/bnfparser" target="_blank">bnfparser</a></dt>
+                            <dd class="desc-list__definition">Распознающий недетерминированный конечный автомат с магазинной памятью, позволяющий читать цепочки, порожденные языком КС-грамматики и настраиваемый с помощью нотации Бэкуса-Науэра. Написан на чистой Java.</dd>
+                        </div>
+                        <div class="desc-list__item_margin-large">
+                            <dt class="desc-list__title">sdcp</dt>
+                            <dd class="desc-list__definition">Десктопная программа для рассчета судостроительных спецификаций, способная "обходить" человеческие ошибки. Использует граф для построения структуры файловой системы, спроектирована в виде отдельных модулей. Использованные технологии: Java, JavaFX, ApachPOI, SQLite.</dd>
+                        </div>
+                    </dl>                    
+                    <h2 class="article__heading article__heading_h2" id="anchor_working">Деятельность</h2>
+                    <dl class="desc-list">
+                        <div class="desc-list__item_margin-small">
+                            <dt class="desc-list__title inline-block">Текущееs место работы:</dt>
+                            <dd class="desc-list__definition inline-block"><a href="http://www.cngsgroup.com" target="_blank">CNGS Engineering</a>, последние 3 года</dd>
+                            <dt class="desc-list__title inline-block">Профиль фирмы, должность, обязанности:</dt>
+                            <dd class="desc-list__definition inline-block">Проектирование и строительство нефтяных платформ. Инженер-конструктор. Проектирование и конструирование несущих конструкций платформы (построение 3д моделей и чертежей), выполнение конечноэлементных рассчетов и тесное сотрудничество с инженерами смежных проектных подразделений.</dd>
+                        </div>
+                    </dl>                    
+                    <h2 class="article__heading article__heading_h2" id="anchor_contacts">Контакты</h2>
+                    <div class="contacts-list contacts-list_type-normal">
+                        <a class="contacts-list__item contacts-list__item_type-vk" href="https://vk.com/lastgunslinger" target="_blank">
+                            Профиль ВК
+                        </a>
+                        <a class="contacts-list__item contacts-list__item_type-github" href="https://github.com/Dischain" target="_blank">
+                            Профиль на GitHub
+                        </a>
+                        <a class="contacts-list__item contacts-list__item_type-yandex" href="mailto:rdischain@yandex.ru" target="_blank">
+                            Яндекс.Почта
+                        </a>
+                        <a class="contacts-list__item contacts-list__item_type-phone">Звоните: +7 978 789 0475</a>
+                    </div>
+                    <div class="contacts-list contacts-list_type-print">                        
+                        <div class="desc-list__item_margin-small">
+                            <dt class="desc-list__title inline-block">VK:</dt>
+                            <dd class="desc-list__definition inline-block"><a href="https://vk.com/lastgunslinger" target="_blank">https://vk.com/lastgunslinger<a></dd>
+                        </div>  
+                        <div class="desc-list__item_margin-small">
+                            <dt class="desc-list__title inline-block">Github:</dt>
+                            <dd class="desc-list__definition inline-block"><a href="https://github.com/Dischain" target="_blank">https://github.com/Dischain<a></dd>
+                        </div>                 
+                        <div class="desc-list__item_margin-small">
+                            <dt class="desc-list__title inline-block">Email:</dt>
+                            <dd class="desc-list__definition inline-block"><a href="mailto:rdischain@yandex.ru">rdischain@yandex.ru<a></dd>
+                        </div>
+                        <div class="desc-list__item_margin-small">
+                            <dt class="desc-list__title inline-block">Моб. телефон:</dt>
+                            <dd class="desc-list__definition inline-block">+7 978 789 0475</dd>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="footer">
+                <p>©2017 dischain</p>
+            </div>
+            <div class="scroll-to-top"></div>
+        </div>
+        <script src="./js/jquery-1.7.2.min.js"></script>
+        <script src="./js/index.js"></script>
+    </body>
 </html>
