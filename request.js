@@ -1,165 +1,61 @@
-/* AjaxHandler interface. */
-var AjaxHandler = new Interface('AjaxHandler', ['request', 'createXhrObject']);
-/* SimpleHandler class. */
-var SimpleHandler = function() {}; // implements AjaxHandler
-SimpleHandler.prototype = {
-  request: function(method, url, callback, postVars) {
-    var xhr = this.createXhrObject();
-    xhr.onreadystatechange = function() {
+Отправляю это сюда, чтоб завтра взглянуть на обеде (посмотреть на работе почту или скинуть его на флешку и пронести ее на работу я не могу)
 
-    if(xhr.readyState !== 4) return;
-    
-    (xhr.status === 200) ?
-      callback.success(xhr.responseText, xhr.responseXML) :
-      callback.failure(xhr.status);
-    };
+Здравствуйте!
 
-    xhr.open(method, url, true);
+Добрый день.
+Вы получили это письмо, так как хотите принять участие в Школе Node.JS.
+Для поступления в Школу Вам необходимо успешно выполнить тестовое задание.
+Выполненное задание необходимо предоставить в виде ссылки на репозиторий на github.com ответным письмом не позднее 1 сентября включительно. 
+После его проверки с Вами свяжется наш HR и расскажет о дальнейших шагах.
+Удачи!
+ -------------------------------------------
+Необходимо реализовать html-страницу с разметкой, логикой поведения и предоставлением глобального js-объекта с методами, описанными в п.1,2,3
 
-    if(method !== 'POST') postVars = null;
-    
-    xhr.send(postVars);
-  },
+1. Разметка
 
-  createXhrObject: function() { // Factory method.
-    var methods = [
-      function() { return new XMLHttpRequest(); },
-      function() { return new ActiveXObject('Msxml2.XMLHTTP'); },
-      function() { return new ActiveXObject('Microsoft.XMLHTTP'); }
-    ];
+На странице должна быть задана html-форма с id="myForm", внутри которой содержатся
+a. инпуты
+- ФИО (name="fio"),
+- Email (name="email"),
+- Телефон (name="phone");
+b. кнопка отправки формы (id="submitButton").
+А также должен быть задан div-контейнер с id="resultContainer" для вывода результата работы формы.
 
-    for(var i = 0, len = methods.length; i < len; i++) {
-      try {
-        methods[i]();
-      }
-      catch(e) {
-        continue;
-      }
+2. Поведение
 
-      // If we reach this point, method[i] worked.
-      this.createXhrObject = methods[i]; // Memoize the method.
-      return methods[i];
-    }
+При отправке формы должна срабатывать валидация полей по следующим правилам:
+- ФИО: Ровно три слова.
+- Email: Формат email-адреса, но только в доменах ya.ru, yandex.ru, yandex.ua, yandex.by, yandex.kz, yandex.com.
+- Телефон: Номер телефона, который начинается на +7, и имеет формат +7(999)999-99-99. Кроме того, сумма всех цифр телефона не должна превышать 30. Например, для +7(111)222-33-11 сумма равняется 24, а для +7(222)444-55-66 сумма равняется 47.
 
-    // If we reach this point, none of the methods worked.
-    throw new Error('SimpleHandler: Could not create an XHR object.');
-  }
-};
+Если валидация не прошла, соответствующим инпутам должен добавиться класс error с заданным стилем border: 1px solid red.
+Если валидация прошла успешно, кнопка отправки формы должна стать неактивной и должен отправиться ajax-запрос на адрес, указанный в атрибуте action формы.*
 
-/* QueuedHandler class. */
-var QueuedHandler = function() { // implements AjaxHandler
-  this.queue = [];
-  this.requestInProgress = false;
-  this.retryDelay = 5; // In seconds.
-};
+Может быть 3 варианта ответа на запрос с разным поведением для каждого:
+a. {"status":"success"} – контейнеру resultContainer должен быть выставлен класс success и добавлено содержимое с текстом "Success"
+b. {"status":"error","reason":String} - контейнеру resultContainer должен быть выставлен класс error и добавлено содержимое с текстом из поля reason
+c. {"status":"progress","timeout":Number} - контейнеру resultContainer должен быть выставлен класс progress и через timeout миллисекунд необходимо повторить запрос (логика должна повторяться, пока в ответе не вернется отличный от progress статус)
 
-extend(QueuedHandler, SimpleHandler);
+* Для простоты тестирования сабмита формы можно выполнять запросы на статические файлы с разными подготовленными вариантами ответов (success.json, error.json, progress.json). Поднимать отдельный сервер с выдачей разных ответов будет избыточным.
 
-QueuedHandler.prototype.request = function(method, url, callback, postVars,override) {
-  if(this.requestInProgress && !override) {
-    this.queue.push({
-      method: method,
-      url: url,
-      callback: callback,
-      postVars: postVars
-    });
-  } else {
-    this.requestInProgress = true;
-    var xhr = this.createXhrObject();
-    var that = this;
-    xhr.onreadystatechange = function() {
-    
-    if(xhr.readyState !== 4) return;
-    
-    if(xhr.status === 200) {
-      callback.success(xhr.responseText, xhr.responseXML);
+3. Глобальный объект
 
-      that.advanceQueue();
-    } else {
-      callback.failure(xhr.status);
+В глобальной области видимости должен быть определен объект MyForm с методами
+validate() => { isValid: Boolean, errorFields: String[] }
+getData() => Object
+setData(Object) => undefined
+submit() => undefined
 
-      setTimeout(function() { that.request(method, url, callback, postVars); },
-      that.retryDelay * 1000);
-    }
-  };
+Метод validate возвращает объект с признаком результата валидации (isValid) и массивом названий полей, которые не прошли валидацию (errorFields).
+Метод getData возвращает объект с данными формы, где имена свойств совпадают с именами инпутов.
+Метод setData принимает объект с данными формы и устанавливает их инпутам формы. Поля кроме phone, fio, email игнорируются.
+Метод submit выполняет валидацию полей и отправку ajax-запроса, если валидация пройдена. Вызывается по клику на кнопку отправить.
 
-    xhr.open(method, url, true);
-  
-    if(method !== 'POST') postVars = null;
-  
-    xhr.send(postVars);
-  }
-};
 
-QueuedHandler.prototype.advanceQueue = function() {
-  if(this.queue.length === 0) {
-    this.requestInProgress = false;
-    return;
-  }
+В корне проекта обязательно должны присутствовать файлы
+/index.html — разметка страницы;
+/index.js – вся клиентская логика страницы.
 
-  var req = this.queue.shift();
-  this.request(req.method, req.url, req.callback, req.postVars, true);
-};
-
-/* OfflineHandler class. */
-var OfflineHandler = function() { // implements AjaxHandler
-  this.storedRequests = [];
-};
-
-extend(OfflineHandler, SimpleHandler);
-
-OfflineHandler.prototype.request = function(method, url, callback, postVars) {
-  if(XhrManager.isOffline()) { // Store the requests until we are online.
-    this.storedRequests.push({
-      method: method,
-      url: url,
-      callback: callback,
-      postVars: postVars
-    });
-  } else { // Call SimpleHandler's request method if we are online.
-    this.flushStoredRequests();
-    OfflineHandler.superclass.request(method, url, callback, postVars);
-  }
-};
-
-OfflineHandler.prototype.flushStoredRequests = function() {
-  for(var i = 0, len = storedRequests.length; i < len; i++) {
-    var req = storedRequests[i];
-    OfflineHandler.superclass.request(req.method, req.url, req.callback, req.postVars);
-  }
-};
-
-/* XhrManager singleton. */
-var XhrManager = {
-  createXhrHandler: function() {
-    var xhr;
-    
-    if(this.isOffline()) {
-      xhr = new OfflineHandler();
-    } else if(this.isHighLatency()) {
-      xhr = new QueuedHandler();
-    } else {
-      xhr = new SimpleHandler()
-    }
-
-    Interface.ensureImplements(xhr, AjaxHandler);
-    
-    return xhr
-  },
-
-  isOffline: function() { // Do a quick request with SimpleHandler and see if
-    ... // it succeeds.
-  },
-
-  isHighLatency: function() { // Do a series of requests with SimpleHandler and
-    ... // time the responses. Best done once, as a
-    // branching function.
-  }
-};
-
-var myHandler = XhrManager.createXhrHandler();
-var callback = {
-  success: function(responseText) { alert('Success: ' + responseText); },
-  failure: function(statusCode) { alert('Failure: ' + statusCode); }
-};
-myHandler.request('GET', 'script.php', callback);
+Для выполнения задания разрешается использовать любые сторонние фреймворки и библиотеки.
+Также можно использовать любые современные спецификации, реализованные в последних версиях браузера Chrome.
+Код должен работать локально без необходимости доступа в интернет. Это значит, что при использовании сторонних решений их нужно выкачивать в свой репозиторий.
