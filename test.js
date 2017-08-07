@@ -1,20 +1,38 @@
-'use strict'
+'use strict';
 
-//Test PQ
-const AsyncPQ  = require('./src/async/asyncPQ.js'),
-	    readFile = require('fs').readFile;
+const http = require('http')
+        , path = require('path')
+        , url    = require('url')
+        , fs      = require('fs');
 
-let apq = new AsyncPQ([
-	[ ['./test/test1.js'], readFile, (data) => console.log(data.toString()), 0 ],
-	[ ['./test/test2.js'], readFile, (data) => console.log(data.toString()), 5 ],
-	[ ['./test/test3.js'], readFile, (data) => console.log(data.toString()), 2 ]
-]);
+let publicDir = './public';
+//publicDir = path.normalize(path.resolve(root || '.'));
+const publicDirPath = path.resolve(publicDir);
 
-//Parallel limited
-//apq.parallelLimited(2).run(() => { console.log('completed'); })
+http.createServer(function (req, res) {
+  console.log(req.url);
+  const reqPath = url.parse(req.url).pathname;
+  console.log(reqPath);
+  const reqFullPath = path.join(publicDirPath, reqPath);
 
-//Parallel
-//apq.parallel().run(() => { console.log('completed parallel'); })
+  fs.exists(reqFullPath, function(exists) {
+    if (!exists) { 
+      res.statusCode = 404; 
+      res.end(`File ${reqFullPath} not foud, mother fucker! :)`);
+      return;
+    }
 
-//Series
-//apq.serial().run(() => { console.log('completed serial'); })
+    /*if (fs.statSync(pathName).isDirectory()) {
+      reqFullPath += '/index.html';
+    }*/
+
+    fs.readFile(reqFullPath, function(err, data) {
+      if (err) { res.statusCode(500); res.end(`Error getting file: ${err}`); }
+      else {
+        const ext  = path.parse(reqFullPath).ext;
+
+        res.end(data);
+      }
+    });
+  });
+}).listen(3000, function() { console.log('server is now  running on port 3000'); });
