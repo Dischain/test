@@ -1,327 +1,44 @@
-/* Eric Meyer's Reset CSS v2.0 */
-html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td,article,aside,canvas,details,embed,figure,figcaption,footer,header,hgroup,menu,nav,output,ruby,section,summary,time,mark,audio,video{border:0;font-size:100%;font:inherit;vertical-align:baseline;margin:0;padding:0}article,aside,details,figcaption,figure,footer,header,hgroup,menu,nav,section{display:block}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:none}table{border-collapse:collapse;border-spacing:0}
+const zlib  = require('zlib')
+	, fs    = require('fs')
+    , util  = require('../util')
+	, cache = require('../cache'); // - кеш для сжатых данных
 
-@font-face {
-    font-family: "MerriweatherLight";
-    src: url("../fonts/MerriweatherLight/MerriweatherLight.eot");
-    src: url("../fonts/MerriweatherLight/MerriweatherLight.eot?iefix") format("embedded-opentype"),
-         url("../fonts/MerriweatherLight/MerriweatherLight.woff") format("woff"),
-         url("../fonts/MerriweatherLight/MerriweatherLight.ttf") format("truetype");
-    font-style: normal;
-    font-weight: normal;
-}
-@font-face { 
-    font-family: "B20SansSemiCondensed";
-    src: url("../fonts/B20SansSemiCondensed/B20SansSemiCondensed.eot");
-    src: url("../fonts/B20SansSemiCondensed/B20SansSemiCondensed.eot?iefix") format("embedded-opentype"),
-         url("../fonts/B20SansSemiCondensed/B20SansSemiCondensed.woff") format("woff"),
-         url("../fonts/B20SansSemiCondensed/B20SansSemiCondensed.ttf") format("truetype");
-    font-style: normal;
-    font-weight: normal;
-}
-@font-face {
-    font-family: "ProximaNova";
-    src: url("../fonts/ProximaNova/ProximaNova-Bold.otf");
-    font-style: normal;
-    font-weight: bold;   
-}
-.clearfix:after {
-    content: '';
-    display: block;
-    clear: both;
-}
-.left-container {
-    width: 190px;
-    float: left;
-    position: fixed;
-    height: 90%;
-}
-.side-bar {
-    text-align: center;
-}
-.side-bar__item a:hover {
+// Util:
+// function capitalizeFirst (str) { return str.charAt(0).toUpperCase() + str.slice(1); }
+// function getZlibFuncByEncoding (encoding) { return 'create' + capitalizeFirst(encoding); }
+// function getFullPath (req, root) {
+	// это вып. при инициализации: const publicDir = path.normalize(path.resolve(root));
+//	const pathName = path.normalize(url.parse(req.url).pathname)
+//	return path.join(root, pathName);
+// }
+
+const defaultOpts = {
+	flush: zlib.constants.Z_NO_FLUSH,
+	memlevel: zlib.constants.Z_BEST_COMPRESSION,
+	strategy: zlib.constants.Z_DEFAULT_STRATEGY
+};
+
+// If we are here, then file already exists
+function sendCompressedFile(req, res, opts, cache) {
+	const path     = util.getFullPath(req)
+	    , encoding = getEncoding(req)
+	    , options  = opts ? opts : defaultOpts
+	    , zlibFunc = zlib.[getZlibFuncByEncoding(encoding)]
+
+	res.writeHead(200, {'Content-Encoding': encoding});
 	
-}
-.side-bar__header {
-    padding: 20px 20px 40px 20px;
-    width: auto;
-}
-.side-bar__item {
-    font-size: 20px;
-    margin-bottom: 20px;
-    font-family: "ProximaNova", Arial, serif;
-    text-align: left;
-    padding-left: 25px;
-}
-.side-bar .side-bar__item_active span {
-	color: red;
-}
-.side-bar__item:hover {	
-	cursor: pointer;
-}
-.side-bar__item span {
-	display: inline-block;
-	position: relative;
-	transition: 0.5s; 
-	color: #6897c5;
-}
-.side-bar__item span:after {
-	content: '\00bb';
-	position: absolute;
-	opacity: 0;
-	right: -15px;
-	transition: 0.5s;
-}
-.side-bar__item:hover span {
-	padding-right: 20px;
-}
-.side-bar__item:hover span:after {
-	opacity: 1;
-	right: 0;
-}
-
-.author {
-    text-decoration: none;
-    font-family: Helvetica, serif;
-}
-.author__avatar {
-    background-image: url(../img/best_cat_ever.png);
-    background-size: 130px 130px;
-    margin: auto;
-    margin-bottom: 20px;
-    width: 130px; height: 130px;
-    border-radius: 65px;
-}
-.author__info {
-    color: #aaa;
-    font-size: 16px;
-    line-height: 18px;
-}
-.author__info:hover {
-	color: red;
-}
-.content {
-    margin-left: 170px; 
-    padding: 20px;
-}
-.article {
-	clear: left;
-	font-family: "MerriweatherLight", Arial, sans-serif;
-}
-.article a {
-	text-decoration: none;
-}
-.article a:hover {
-	color: red;
-}
-.article__heading {
-	font-family: "B20SansSemiCondensed", Helvetica, sans-serif;
-	font-weight:300;
-	color: #6897c5;
-}
-.article__heading_h1 {
-	font-size: 36px;
-	line-height: 48px;
-	margin: 0px 0px 20px 0px;
-}
-.article__heading_h2 {
-	font-size: 28px;
-	line-height: 36px;
-	margin: 0px 0px 15px 0px;
-}
-.article__heading_h3 {
-	font-size: 22px;
-	line-height: 30px;
-	margin: 0px 0px 10px 0px;
-}
-.article p {
-	max-width: 960px;
-	clear: left;
-	margin: 0px 0px 16px 0px;
-	line-height: 20px;
-	font-size: 16px;
-}
-
-.desc-list {
-	font-size: 16px;
-	line-height: 20px;
-	margin: 0px 0px 10px 20px;
-}
-
-.desc-list__item {
-	display: block;
-}
-
-.desc-list__item_margin-small {	
-	margin: 2px 0px;
-}
-
-.desc-list__item_margin-large {
-	margin: 10px 0px;
-}
-
-.desc-list__title {
-	font-weight: bold;
-}
-
-.desc-list__definition {
-	max-width: 890px;
-}
-
-.inline-block {
-	display: inline-block;
-}
-
-.scroll-to-top {
-	background-image: url(../img/up.png);
-	background-repeat: no-repeat;
-    width: 64px; height: 64px;
-    position: fixed;
-    bottom: 32px;
-    right: 32px;
-    cursor: pointer;
-    display: none;
-}
-.scroll-to-top:hover {
-	opacity: 0.7;
-}
-
-.contacts-list {
-	margin-left: 30px;
-	padding-bottom: 15px;
-}
-.contacts-list a {
-	text-decoration: none;
-}
-.contacts-list_type-normal{
-	display: block;
-}
-.contacts-list_type-print{
-	display: none;
-}
-.contacts-list a:hover {
-	color: red;
-}
-.contacts-list__item {
-	display: block;
-	padding: 10px 0px 10px 30px;
-}
-.contacts-list__item_type-vk {
-	background-image: url(../img/vk_logo.png);
-	background-repeat: no-repeat;
-	background-position: 0px 5px;
-}
-.contacts-list__item_type-github {
-	background-image: url(../img/github_logo.png);
-	background-repeat: no-repeat;
-	background-position: 0px 5px;
-}
-.contacts-list__item_type-yandex {
-	background-image: url(../img/yandex_mail.png);
-	background-repeat: no-repeat;
-	background-position: 0px 5px;
-}
-.contacts-list__item_type-phone {
-	background-image: url(../img/phone.png);
-	background-repeat: no-repeat;
-	background-position: 0px 5px;
-}
-
-.plain-list {
-	list-style: square outside;
-}
-
-.social-links {
-	margin: 100px 49px 20px 49px;
-}
-.social-links__service {
-	width: 24px; height: 24px;
-	padding: 2px;
-	display: inline-block;
-	border-radius: 3px;
-}
-.social-links__service:hover {
-	opacity: 0.7;
-}
-.social-links__service_type-vk {
-	background: no-repeat url(../img/vk_logo.png);
-}
-.social-links__service_type-yandex {
-	background: no-repeat url(../img/yandex_mail.png);
-}
-.social-links__service_type-github {
-	background: no-repeat url(../img/github_logo.png);
-}
-.footer {
-	text-align: center;
-	color: #aaa;
-    font-size: 16px;
-    line-height: 18px;
-    margin: 20px;
-}
-
-code {
-	background-color: rgba(27, 31, 35, 0.05);
-	font-size: 0.8em;
-	font-family: monospace;
-	padding: 0.2em;
-	border-radius: 3px;
-}
-
-@media only screen and (max-width: 640px) {
-    .left-container {
-        display: none;
-    }
-    .content {
-        margin-left: 20px;
-        padding: 10px;
-    }
-}
-
-@media print {
-	.left-container {
-		display: none;
+	if (cache.get(path)) {
+		pipeTo(cache.get(path), res, zlibFunc);
+	} else {
+		require('stream-to').buffer(fs.createReadStream(path), (err, buffer) => {
+			cache.set(path, buffer);
+			pipeTo(buffer, res, zlibFunc);
+		})
 	}
-	.content {
-		margin-left: 20px;
-		padding: 10px;
-	}
-	.article p {
-		max-width: 960px;
-		clear: left;
-		margin: 0px;
-		line-height: 18px;
-		font-size: 14px;
-	}
-	.article__heading {
-		font-family: 'B20SansSemiCondensed', Helvetica, sans-serif;
-		font-weight: 300;
-		color: #6897c5;
-		margin: 5px 0px;
-	}
-	.article__heading_h1 {
-		font-size: 26px;
-		line-height: 42px;
-		margin-top: 5px;
-	}
-	.article__heading_h2 {
-		font-size: 22px;
-		line-height: 30px;
-		margin-top: 5px;
-	}
-	.article__heading_h3 {
-		font-size: 20px;
-		line-height: 24px;
-		margin-top: 5px;
-	}
-	.contacts-list {
-		margin-left: 30px;
-		padding-bottom: 0px;
-	}
-	.contacts-list_type-normal{
-		display: none;
-	}
-	.contacts-list_type-print{
-		display: block;
-	}
+}
+
+function pipeTo(buffer, writable, func) {
+	fs.createReadStream(buffer)
+			.pipe(func.call(null))
+			.pipe(writable);
 }
