@@ -12,6 +12,12 @@ const zlib  = require('zlib')
 //	return path.join(root, pathName);
 // }
 
+// Cache:
+// 'use strict';
+// let _cache = {};
+// function set(key, val) { _cache[key] = val; }
+// function get(key) { return _cache[key]; }
+
 const defaultOpts = {
 	flush: zlib.constants.Z_NO_FLUSH,
 	memlevel: zlib.constants.Z_BEST_COMPRESSION,
@@ -29,11 +35,26 @@ function sendCompressedFile(req, res, opts, cache) {
 	
 	if (cache.get(path)) {
 		pipeTo(cache.get(path), res, zlibFunc);
-	} else {
+	} /*else {
 		require('stream-to').buffer(fs.createReadStream(path), (err, buffer) => {
 			cache.set(path, buffer);
 			pipeTo(buffer, res, zlibFunc);
-		})
+		});
+	}*/
+	else {
+		let readStream = fs.createReadStream(path)
+		  , buffers    = [];
+
+		readStream.on('data', (chunk) => {
+			buffers.push(chunk);
+		});
+
+		readStream.on('end', () => {
+			let resultBuffer = Buffer.concat(buffers);
+
+			cache.set(path, resultBuffer);
+			pipeTo(resultBuffer, res, zlibFunc);
+		});
 	}
 }
 
