@@ -1,135 +1,113 @@
+## CLI usage
+
+In order to run [node-static-server] from console, use command with next
+syntax:
+
+nss [path_to_config] | [path_to_root]
+
+[path_to_config] - is the path to your `config.js` file, which determines
+same options, as you may provide to configure server from JavaScript code.
+
+// congig.js
+
+module.exports = {
+	root: './root',
+	cache: true,
+	gzip: true,
+	port: 3000
+}
+
+[path-to-root] - path to your root folder, which static server should serve
+
+Simple example:
+
+```
+nss ../myconf.js
+```
+
+In this case, you provide all nesessary data for server in `./myconf.js` file.
+If no `root` field specified, the default root path should used (`./`).
+
+```
+nss ./public
+```
+
+In this case, you provide only the path to your public directory which you want
+[node-static-server] serve. Default server configurations should be applied.
+
+```
+nss
+```
+
+Here [node-static-server] should run static server fully with the default configs.
+
 'use strict';
 
-const path = require('path')
-    , url  = require('url')
-    , http = require('http');
+const fs = require('fs');
 
-// Options:
-//
-// cache: {Boolean} - false by default
-// cacheHeaders: {String} - if not specified and if cache is true, the default max-age header 
-//                          should be 3600 seconds
-//
-// encoding: {Boolean} - accept encoding.
-// 
-// cors: {Boolean}
-// corsHeaders: {String}
-//
-// host: {String} - if not specified, default host should be `127.0.0.1`
-// port: {Number} - if not specified, default port should be 3000
-// root: {String} - if not specified, default path to directory is './'
-// name: {String}
-//
-// notFound: {String} - path to default 404 answer; should be placed into the `root`folder
+function Server(opts) { this._opts = opts; }
+Server.prototype.start = function() { console.log(this._opts); };
 
-const defaultOpts = {
-	cache: false,
-	cacheHeaders: 'private, max-age=3600',
-	encoding : false,
-	host: '127.0.0.1',
-	port: 3000,
-	root: './',
-	cors: false,
-	corsHeaders: '',
-	name: 'node.js'
-}
+function createServer(opts) { new Server(opts).start(); }
 
-function Server(opts) {
-	if (!opts) {
-		this.options = defaultOpts;
+// @returns false if no errors, true if contains errors
+function checkErrors(args, output) {
+	if (args.length === 1 && !fs.existsSync(args[0])) {
+		output('nss: no such file or directory, ' + args[0]);
+
+		return true;
+	} else if (args.length >= 2) {
+		output('nss: wrong arguments\n' + getHelpMsg());
+
+		return true;
 	} else {
-		this.options = Object.keys(defaultOpts).reduce((init, key) => {
-			if (!opts[key] || opts[key] === '') {
-				init[key] = defaultOpts[key]
-			} else {
-				init[key] = opts[key];
-			}
-	
-			return init;
-		}, {});
-	}
-
-	this.options.root = path.resolve(path.normalize(this.options.root));
-	console.log(this.options)
-}
-
-Server.prototype.start = function start(callback) {
-  this._server = http.createServer(handler(this))
-                     .listen(this.options.port, this.options.host, callback);
-};
-
-Server.prototype.stop = function stop() {
-  if (this._server) {
-    this._server.close();
-    this._server = null;
-  }
-};
-
-function handler(server) {
-	return function(req, res) {
-		let pathname  = url.parse(req.url).pathname
-		  , fullPath = path.join(server.options.root, pathname);
-		
-		res.headers = {};
-		
-		if (server.options.name) {
-     		res.headers['X-Powered-By'] = server.options.name;
-    	}
-
-		if (server.options.cors) {
-    		res.headers['Access-Control-Allow-Origin'] = '*';
-    		res.headers['Access-Control-Allow-Headers'] = 'Origin, X-Requested-With, Content-Type, Accept, Range';
-    		if (server.options.corsHeaders) {
-      			server.options.corsHeaders.split(',')
-          			.forEach((header) => { 
-          				res.headers['Access-Control-Allow-Headers'] += ', ' + header; });
-    		}
-  		}
-
-		getStat(fullPath).then((stat) => {			
-			if (stat.isDirectory()) {
-				sendFile(path.join(fullPath, 'index.html'));
-			} else {
-				sendFile(fullPath, stat, res, server);
-			}
-		}).catch((err) => {
-			if (err.code = 'ENOENT') {
-				sendError(res, server);
-			}
-		})
-
-  		/*if (server.options.cache) {
-			res.headers['Cache-Control'] = server.options.cacheHeaders;
-  		}*/
-
-		res.writeHead(200, res.headers);
-		
-		res.write('hello');
-		res.end();
-	} 
-}
-
-function sendFile() {
-	res.headers['Etag']           = JSON.stringify([stat.ino, stat.size, stat.mtime.getTime()].join('-'));
-    res.headers['Date']           = new Date().toUTCString();
-    res.headers['Last-Modified']  = new Date(stat.mtime).toUTCString();
-}
-
-// houston
-//static-server: requestHandler -> getFileStats -> sendFile(stat)
-function getStat(path) {
-	return new Promise((resolve, reject) => {
-		require('fs').stat(path, (err, stat) => {
-			if (err) return reject(err)
-			resolve(stat);
-		});
-	});
-}
-
-function sendFile(fullPath, stat, res, serv) {
-	if (serv.options.cache) {
-
+		return false;	
 	}
 }
 
-new Server({cache: true, cors: true, name: 'dischain-serv'}).start();
+function getOpts(path) {
+	let opts = {};
+
+	if (fs.statSync(path).isDirectory()) {
+		opts.root = path ;
+	} else {
+		opts = require(path);
+	}
+
+	return opts;
+}
+
+function getHelpMsg() {
+	return 'nss is a simple static server based on Node.js\n'
+                        + 'Syntax:\n\n'
+                        + 'nss [path_to_config] | [path_to_root]\n\n'
+                        + '[path-to-root]   - path to your root folder, which static server should serve\n'
+                        + '[path_to_config] - is the path to your `config.js` file\n\n'
+                        + '--help - print this help and exit';
+}
+
+function parseArgs(consoleArgs, output) {
+	const args = Array.prototype.slice.call(consoleArgs, 1);
+
+	if (args[0] === '--help') {
+		return output(getHelpMsg());
+	}
+
+	if (!checkErrors(args, output)) {
+		const opts = getOpts(args[0]);
+
+		createServer(opts);
+	}
+}
+
+// Should start server in `./root` folder 
+parseArgs(['nss', './root'], console.log);
+
+// Should start server with opts specified in `./config.js`
+parseArgs(['nss', './config.js'], console.log);
+
+// Should return `ENOENT` error 
+parseArgs(['nss', './not-exists-config.js'], console.log);
+
+// Should return wrong arguments
+parseArgs(['nss', './config.js', 'blah'], console.log);
