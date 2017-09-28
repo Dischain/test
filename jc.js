@@ -1,135 +1,101 @@
-'use strict';
+// app.jsx
+import React from 'react';
+import { render } from 'react-dom';
 
-const // Home = require('./pages/home.jsx')
-    , Login = require('./pages/login.jsx')
-    , Register = require('./pages/register.jsx')
-    , Issue = require('./pages/issue.jsx')
-    , IssueEdit = require('./pages/issue_edit.jsx')
-    , Issues = require('./pages/issues.jsx')
-    , User = require('./pages/user.jsx')
-    , NotFound = require('./pages/not_found.jsx')
-    , Layout = require('./layout.js');
+import Navbar from './components/Navbar.jsx';
+import PreviewContainer from './components/PreviewContainer.jsx';
+import Footer from './components/Footer.jsx';
 
-const reactRouter = require('react-router')
-    , Router = reactRouter.Router
-    , Route = reactRouter.Router
-    , IndexRoute = reactRouter.IndexRoute
-    , browserHistory = reactRouter.browserHistory;
-
-const Routes = (
-    <Router history={browserHistory}>
-        <Route path='/' component={Layout}>
-            <Route path='register' component={Register}/>
-            <Route path='login' component={Login}/>
-            <Route path='issues' component={Issues}>
-                <Route path='issues/:issueId' component={Issue}>
-                    <Route path='issues/:issueId/edit' component={IssueEdit}/>
-                </Route>
-            </Route>
-            <Route path='users/:userId' component={User}/>
-        </Route>
-    </Router>
+render(
+    <div className={'container'}>
+        <Navbar />
+        <PreviewContainer />
+        <Footer />
+    </div>,
+    document.getElementById('app')
 );
 
-'use strict';
+// ./components/PreviewContainer.jsx
+import React from 'react';
+import { Provider } from 'react-redux';
 
-const React = require('react');
+import Editor from './Editor.jsx';
+import Preview from './Preview.jsx';
 
-const AuthAction = require('./actions/auth.js');
+import configureStore from './store/configureStore.js';
 
-const Layout = React.createClass({
-    componentDidMount() {
-        AuthAction.fetchUser();
-    }
+const store = configureStore({source: ''});
 
+export default () => {
+    return (
+        <div className={'row'}>
+            <Provider store={store}>
+                <Editor />
+                <Preview />
+            </Provider>
+        </div>
+    );
+};
+
+// ./components/Editor.jsx
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+
+class Editor extend Component {
     render() {
-        return(
-            <div>
-                {
-                    React.cloneElement(this.props.children, this.state)
-                }
+        return (
+            <div className={'col-md-6'}>
+                <input type='text' onChange={this.props.onSourceChange} text={this.props.source}/>
             </div>
         );
     }
-});
-
-module.exports = Layout;
-
-/*          Description
-**********************************************************/
-import ProductActions from "./actions/products"
-// const ProductActions = {
-//   FetchProducts: Reflux.createAction("FetchProducts")
-// };
-import ProductStore from "./stores/products"
-// import ProductActions from '../actions/products';
-
-// const ProductStore = Reflux.createStore({
-
-//   init() {
-//     this.listenTo(
-//       ProductActions.FetchProducts,
-//       this.onFetchProducts
-//     );
-//   },
-
-//   onFetchProducts(){
-//     Request
-//     .get('/products.json')
-//     .end((err, res)=>{
-//       if(err)
-//         alert(err)
-//       this.trigger(
-//         JSON.parse(res.text)
-//       );
-//     });
-//   }
-
-// });
-
-const Layout = React.createClass({
-  mixins: [ Reflux.listenTo(ProductStore, 'onFetchProducts') ],
-
-  onFetchProducts(data) { this.setState({ products: data }) },
-
-  componentDidMount() {
-    ProductActions.FetchProducts();
-  },
-
-  render() {
-      return(
-        { React.cloneElement(this.props.children, this.state) }
-      );
-  }
 }
 
-LoginAction = {
-    Login: Reflux.createAction('Login');
+const mapStateToProps = (state) => { source: state.source };
+const mapDispatchToProps = (dispatch) => { onTextChange: dispatch.sourceChange};
+
+export dafault connect(mapStateToProps, mapDispatchToProps)(Editor);
+
+// ./components/Preview.jsx
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import Remarkable from 'ract-remarcable';
+
+class Preview extend Component {
+    render() {
+        return (
+            <div className={'col-md-6'}>
+                <Remarkable source={this.props.source}/>
+            </div>
+        );
+    }
 }
 
-LoginStore = Reflux.createStore({
-    init() {
-        this.listenTo(LoginAction.Login, 'onLogin')
-    },
+const mapStateToProps = (state) => { source: state.source };
+export dafault connect(mapStateToProps)(Preview);
 
-    onLogin(userData) {
-        fetch.post('/login', userData)
-        .then((err, res) => {
-            if (res.status != 401){
-                this.trigger(res.body);
-            }else {
-                // handle unauthorized   
-            }
-        });
-    }
-});
+// actions/source.js
+export function sourceChange(event) {
+    return { type: 'SOURCE_TEXT_CHANGE', source: event.target.text };
+}
+// reducers/source.js
+export function sourceChange(state='', action) {
+    if (action.type = 'SOURCE_TEXT_CHANGE')
+        return action.source;
+    else 
+        return state;
+}
+// reducers/index.js
+export { combineReducers } from 'redux';
+export { sourceChange } from './reducers/source.js';
 
-Layout = React.createClass({
-    mixins: [
-        Reflux.listenTo(LoginStore, 'onLogin')
-    ],
+export default combineReducers({sourceChange});
 
-    onLogin(userData) {
-        this.setState({curUser: userData})
-    }
-})
+// ./store/configureStore.js
+import { createStore } from 'redux';
+
+import rootReducer from '../reducers';
+
+export default function configureStore(initialState) {
+    return createStore(rootReducer, initialState);
+};
