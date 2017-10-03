@@ -1,101 +1,131 @@
-// app.jsx
-import React from 'react';
-import { render } from 'react-dom';
+const mysql = require('mysql');
+const config = require('../config');
+const constants = reqire('../constants');
+const tablesSchemas = require('./schemas.js');
 
-import Navbar from './components/Navbar.jsx';
-import PreviewContainer from './components/PreviewContainer.jsx';
-import Footer from './components/Footer.jsx';
+// constants = {
+//     MODE_PRODUCTION: 'MODE_PRODUCTION',
+//     MODE_DEV: 'MODE_DEV',
+//     READ: 'READ*',
+//     WRITE: 'WRITE'
+// };
 
-render(
-    <div className={'container'}>
-        <Navbar />
-        <PreviewContainer />
-        <Footer />
-    </div>,
-    document.getElementById('app')
-);
+let state = {
+  pool: null,
+  mode: null,
+}
 
-// ./components/PreviewContainer.jsx
-import React from 'react';
-import { Provider } from 'react-redux';
+exports.init = function(mode) {
+  return new Promise((resolve, reject) => {
+    if (mode === constants.MODE_PRODUCTION) {
+      state.pool = mysql.createPoolCluster();
 
-import Editor from './Editor.jsx';
-import Preview from './Preview.jsx';
+      state.pool.add('WRITE', {
+        host: '192.168.0.5',
+        user: 'your_user',
+        password: 'some_secret',
+        database: config.PRODUCTION_DB
+      })
 
-import configureStore from './store/configureStore.js';
+      state.pool.add('READ1', {
+        host: '192.168.0.6',
+        user: 'your_user',
+        password: 'some_secret',
+        database: config.PRODUCTION_DB
+      })
 
-const store = configureStore({source: ''});
-
-export default () => {
-    return (
-        <div className={'row'}>
-            <Provider store={store}>
-                <Editor />
-                <Preview />
-            </Provider>
-        </div>
-    );
-};
-
-// ./components/Editor.jsx
-import React, { Component } from 'react';
-import { connect } from 'react-redux';
-
-class Editor extend Component {
-    render() {
-        return (
-            <div className={'col-md-6'}>
-                <input type='text' onChange={this.props.onSourceChange} text={this.props.source}/>
-            </div>
-        );
+      state.pool.add('READ2', {
+        host: '192.168.0.7',
+        user: 'your_user',
+        password: 'some_secret',
+        database: config.PRODUCTION_DB
+      })
+    } else {
+      state.pool = mysql.createPool({
+        host: 'localhost',
+        user: 'your_user',
+        password: 'some_secret',
+        database: config.TEST_DB
+      })
     }
+
+    state.mode = mode
+    
+    if (!state.pool) return reject(new Error('Missing database connection!'))
+    
+    Promise.all(tablesSchemas.map((schema) => {
+      return _createTable(schema);
+    })).then(() => resolve());
+  });
 }
 
-const mapStateToProps = (state) => { source: state.source };
-const mapDispatchToProps = (dispatch) => { onTextChange: dispatch.sourceChange};
+exports.getConnection = function(type) {
+  const pool = state.pool
 
-export dafault connect(mapStateToProps, mapDispatchToProps)(Editor);
+  return new Promise((resolve, reject) => {
+    if (type === constants.WRITE) {
+      pool.getConnection(constants.WRITE, (err, connection) => {
+        if (err) return reject(err);
 
-// ./components/Preview.jsx
-import React, { Component } from 'react';
-import { connect } from 'react-redux';
-import Remarkable from 'ract-remarcable';
-
-class Preview extend Component {
-    render() {
-        return (
-            <div className={'col-md-6'}>
-                <Remarkable source={this.props.source}/>
-            </div>
-        );
+        resolve(connection);
+      });
+    } else if (type === constants.READ) {
+      pool.getConnection(constants.READ, (err, connection) => {
+        if (err) return reject(err);
+        resolve(connection);
+      });
+    } else {
+      pool.getConnection((err, connection) => {
+        if (err) return reject(err);
+        resolve(connection);
+      });
     }
+  });
 }
 
-const mapStateToProps = (state) => { source: state.source };
-export dafault connect(mapStateToProps)(Preview);
-
-// actions/source.js
-export function sourceChange(event) {
-    return { type: 'SOURCE_TEXT_CHANGE', source: event.target.text };
+exports.clear = function(tables, done) {
+  if (Array.isArray(tables)) {
+    return Promise.all(tables.map((table) => {
+      return _clearTable(table);
+    }));
+  } else {
+    return _clearTable(tables);
+  }
 }
-// reducers/source.js
-export function sourceChange(state='', action) {
-    if (action.type = 'SOURCE_TEXT_CHANGE')
-        return action.source;
-    else 
-        return state;
+
+/*                      Helper functions
+*******************************************************************/
+
+function _createTable(query) {
+  const pool = state.pool;
+
+  return new Promise((resolve, reject) => {
+    pool.query(query, (err) => {
+      if (err) return reject(err);
+      resolve();
+    });
+  })
 }
-// reducers/index.js
-export { combineReducers } from 'redux';
-export { sourceChange } from './reducers/source.js';
 
-export default combineReducers({sourceChange});
+function _clearTable(table) {
+  const pool = state.pool;
+  
+  return new Promise((resolve, reject) => {
+    pool.query('DELETE * FROM ' + table, (err) => {
+      if (err) return reject(err);
+      resolve();
+    });
+  });
+}
 
-// ./store/configureStore.js
-import { createStore } from 'redux';
-
-import rootReducer from '../reducers';
-
-export default function configureStore(initialState) {
-    return createStore(rootReducer, initialState);
-};
+//app.js:
+db.init(config.MODE_PRODUCTION)
+  .then(() => {
+    app.listen(3000, function() {
+      console.log('Listening on port 3000...')
+    });
+  })
+  .catch((err) => {
+    console.log(err)
+    process.exit(1)
+  });
