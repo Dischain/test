@@ -1,90 +1,141 @@
-// 1. Для IN NATURAL LANGUAGE MODE действует так называемое «50% threshold». 
-// Это означает, что если слово встречается более чем в 50% всех просматриваемых полей, 
-// то оно не будет учитываться, и поиск по этому слову не даст результатов. Так же полнотекстовый поиск
-// чувствителен к регистру и распознает только все слово целиком.
-// 1.1 Если сработает не как планировалось -  удалить FULL TEXT индекс из users (name) и вместо
-// полнотекстового поиска применять LIKE '%name%'.
-// 2. Удалить ON DELETE CASCADE из votaions для creator_id foreign key (если пользователь удалился,
-// результаты его голосования все равно должны сохраниться.
-/*                        
-*******************************************************************************/
+// module/users/index.js
+const bcrypt = require('bcrypt-nodejs')
+    , userModel = require('../index.js').getModel('USERS_MODEL')
+    , SALT_WORK_FACTOR = 10;
 
-/*                        /model/votations
-*******************************************************************************/
-// model/votations/index.js
-exports.constants = {
-    CREATE_VOTATION: 'CREATE_VOTATION',
-    GET_ALL: 'GET_ALL',
-    GET_VOTATION_BY_ID: 'GET_VOTATION_BY_ID',
-    GET_ALL_LIMITED_FROM_OFFSET: 'GET_ALL_LIMITED_FROM_OFFSET',
-    FIND_VOTATION_LIMITED_FROM_OFFSET: 'FIND_VOTATION_LIMITED_FROM_OFFSET',
-    GET_USER_VOTATIONS_LIMITED_FROM_OFFSET: 'GET_USER_VOTATIONS_LIMITED_FROM_OFFSET',
-    DELETE_VOTATION_BY_ID: 'DELETE_VOTATION_BY_ID',
-    CLEAR_TABLE: 'CLEAR_TABLE',
-    DROP_TABLE: 'DROP_TABLE'
+exports.register = (userData) => {
+    if (userData.avata === undefined)
+        userData.avatar = constants.DEfAULT_AVATAR_PATH; //путь к дефолтному аватару
+    
+    return new Promise((resolve, reject) => {
+       bcrypt.genSalt(constants.SALT_WORK_FACTOR, (err, salt) => {
+         if(err) return reject(err);
+
+         bcrypt.hash(userData.password, salt, null, (err, hash) => {
+            if(err) return reject(err);
+
+            userData.password = hash;
+
+            userModel.query(exports.constants.CREATE_USER, userData)
+            .then(resolve)
+            .catch(reject);
+         });
+       });
+    });
 };
 
-// models/votations/factory.js
-const constants = require('./index.js').constants;
+exports.validatePassword = (credentials, password) => {
+    return new Promise((resolve, reject) => {
+       users.query(exports.constants.GET_USER_BY_EMAIL, { email: credentials.email }) 
+       .then((user) => {
+          if (user.length === 0) return reject(new Error('invalid email'));
 
-// хорошо задокументировать!
-module.exports = (query, data) => {
-    switch(query) {
-        case constants.CREATE_VOTATION:
-            return 'INSERT INTO votations (title, description, creator_id) VALUES ('
-                 + data.title + ', ' + data.description + ', ' + data.creator_id + ');';
-        case constants.GET_ALL:
-            return 'SELECT * FROM votations ORDER BY created_at DESC;';
-        case constants.GET_VOTATION_BY_ID:
-            return 'SELECT * FROM votations WHERE votations.id = ' + data.id + ';';
-        case constants.GET_ALL_LIMITED_FROM_OFFSET:
-            return 'SELECT * FROM votations LIMIT ' + data.limit + ' OFFSET ' + data.offset + ';';
-        
-        case constants.FIND_VOTATION_LIMITED_FROM_OFFSET:
-            return 'SELECT * FROM votations WHERE MATCH (title,description) AGAINST (' + text + ') '
-                 + ' ORDER BY created_at DESC '
-                 + 'LIMIT ' + data.limit + ' OFFSET ' + data.offset + ';';
+          const actualPassword = user.password;
 
-        case constants.GET_USER_VOTATIONS_LIMITED_FROM_OFFSET:
-            return 'SELECT * FROM votations WHERE votations.creator_id = ' + data.creatorId
-                 + ' ORDER BY created_at DESC'
-                 + ' LIMIT ' + data.limit + ' OFFSET ' + data.offset + ';';
+          bcrypt.compare(actualPassword, password, (err, match) => {
+             if (err) return reject(new Erro('invalid password')) 
 
-        case constants.DELETE_VOTATION_BY_ID:
-            return 'DELETE FROM votations WHERE id = ' + data.id + ';';
-        case constants.CLEAR_TABLE:
-            return 'DELETE FROM votations;';
-        case constants.DROP_TABLE:
-            return 'DROP TABLE IF EXISTS votations;'; // поправить это же у users
-        default:
-            return '';
-    }
+             resolve(match);
+          });
+       });
+    });
+};
+
+　
+exports.isAuthenticated = (req, res, next) => {
+    if(req.isAuthenticated()){
+		next();
+	}else{
+		res.sendStatus(401);
+	}
 }
-/*                        
-*******************************************************************************/
 
-/*                        /model/votes
-*******************************************************************************/
-// model/votes/index.js
-exports.constants = {
-    CREATE_VOTE: 'CREATE_VOTE',
+exports.authorize = (votation) => {
+
+}
+
+//users.test.js
+describe('simple authentication layer', () => {
+    const credentials = {
+        name: 'vasya',
+        email: 'nagibator99@mail.ru',
+        password: 'ubernagibatormamkarotbal_13'
+    };
+    let userId;
+
+    describe('register', () => {
+      it('should register new user and hash password', (done) => {
+        users.register(credentials)
+        .then((result) => users.query(userConstants.GET_USER_BY_ID, result.insertId))
+        .then((user) => {
+           console.log(user);
+           expect(user[0].name).to.equal(credentials.name);
+           expect(user[0].email).to.equal(credentials.email);
+           expect(user[0].password).to.not.equal(credentials.password);
+           done();
+        });
+      });
+    });
+
+    describe('validatePassword', () => {
+       it('should return false on invalid password', (done) => {
+          users.validatePassword(credentials, 'blah') 
+          .then((match) => {
+              expect(match).to.equal(false);
+              done();
+          });
+       });
+
+       it('should return true on valid password', (done) => {
+          users.validatePassword(credentials, credentials.password) 
+          .then((match) => {
+              expect(match).to.equal(true);
+              done();
+          });
+       });
+    });
+});
+
+// auth/index.js
+const passport = require('passport')
+    , LocalStrategy = require('passport-local').Strategy
+    , modelNames = require('../model').modelNames
+    , users = require('../model').getModel(modelNames.USERS_MODEL)
+    , userConstants = require('../model/users').constants;
+
+let init = function() {
+  passport.serializeUser((user, done) => {
+    done(null, user.id);
+  });
+
+  passport.deserializeUser(function(id, done) {    
+    users.query(userConstants.GET_USER_BY_ID, {id: id})
+    .then((user) => done(null, user));
+  });
+
+  passport.use(new LocalStrategy({
+      usernameField: 'email',
+      passwordField: 'password'
+    }, (email, password, done) => {
+
+      users.query(userConstants.GET_USER_BY_EMAIL, {email: email})
+      .then((user) => {
+        if (!user) {
+          return done(null, false, { message: 'Incorrect email or password.' });
+        }
+
+        users.validatePassword(user, password)
+          .then((isMatch) => {
+            isMatch ? 
+              done(null, user) : 
+              done(null, false, { message: 'Incorrect username or password'})
+          })
+          .catch(err => done(err));
+      })
+      .catch(err => done(err));
+  }));
+
+  return passport;
 };
 
-// models/votations/factory.js
-const constants = require('./index.js').constants;
-
-module.exports = (query, data) => {
-    switch (query) {
-        case constants.CREATE_VOTE:
-            return 'INSERT INTO votes (votation_id, creator_id, value) VALUES ('
-                 + data.votation_id + ', ' + data.creator_id + ', ' + data.value + ');';
-        case constants.GET_VOTES_BY_VOTAION_ID:
-            return 'SELECT value FROM votations LEFT JOIN votes ON votations.id = votes.votation_id '
-                 + 'WHERE votations.id = ' + data.votation_id ';';
-        default:
-            return '';
-    }
-};
-
-/*                        
-*******************************************************************************/
+module.exports = init();
