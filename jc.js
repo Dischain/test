@@ -14,9 +14,14 @@ exports.register = (userData) => {
          bcrypt.hash(userData.password, salt, null, (err, hash) => {
             if(err) return reject(err);
 
-            userData.password = hash;
-
-            userModel.query(exports.constants.CREATE_USER, userData)
+            // userData.password = hash; - стереть
+            ///////////////////////////////////////////////////
+            userModel.query(exports.constants.CREATE_USER, { //
+                name: userData.name,                         //
+                email: userData.email,                       // 
+                password: hash                               //
+            ///////////////////////////////////////////////////    
+            })
             .then(resolve)
             .catch(reject);
          });
@@ -24,77 +29,16 @@ exports.register = (userData) => {
     });
 };
 
-exports.validatePassword = (credentials, password) => {
-    return new Promise((resolve, reject) => {
-       users.query(exports.constants.GET_USER_BY_EMAIL, { email: credentials.email }) 
-       .then((user) => {
-          if (user.length === 0) return reject(new Error('invalid email'));
-
-          const actualPassword = user.password;
-
-          bcrypt.compare(actualPassword, password, (err, match) => {
-             if (err) return reject(new Erro('invalid password')) 
-
-             resolve(match);
-          });
-       });
-    });
-};
-
-　
-exports.isAuthenticated = (req, res, next) => {
-    if(req.isAuthenticated()){
-		next();
-	}else{
-		res.sendStatus(401);
-	}
+// сохраняет голосование и его результаты
+function commitVotation(votationData, votes) {
+    votations.query(votationsConstants.CREATE_VOTATION, votationData)
+    .then((result) => {
+        return votes.reduce((init, vote) => {
+            vote.votation_id = result.insertId;
+            return init.then(() => votes.query(votesConstant.CREATE_VOTE), vote);
+        }, Promise.resolve());
+    })
 }
-
-exports.authorize = (votation) => {
-
-}
-
-//users.test.js
-describe('simple authentication layer', () => {
-    const credentials = {
-        name: 'vasya',
-        email: 'nagibator99@mail.ru',
-        password: 'ubernagibatormamkarotbal_13'
-    };
-    let userId;
-
-    describe('register', () => {
-      it('should register new user and hash password', (done) => {
-        users.register(credentials)
-        .then((result) => users.query(userConstants.GET_USER_BY_ID, result.insertId))
-        .then((user) => {
-           console.log(user);
-           expect(user[0].name).to.equal(credentials.name);
-           expect(user[0].email).to.equal(credentials.email);
-           expect(user[0].password).to.not.equal(credentials.password);
-           done();
-        });
-      });
-    });
-
-    describe('validatePassword', () => {
-       it('should return false on invalid password', (done) => {
-          users.validatePassword(credentials, 'blah') 
-          .then((match) => {
-              expect(match).to.equal(false);
-              done();
-          });
-       });
-
-       it('should return true on valid password', (done) => {
-          users.validatePassword(credentials, credentials.password) 
-          .then((match) => {
-              expect(match).to.equal(true);
-              done();
-          });
-       });
-    });
-});
 
 // auth/index.js
 const passport = require('passport')
