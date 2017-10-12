@@ -1,139 +1,30 @@
-// сохраняет голосование и его результаты
-function commitVotation(votationData, votes) {
-    votations.query(votationsConstants.CREATE_VOTATION, votationData)
-    .then((result) => {
-        return votes.reduce((init, vote) => {
-            vote.votation_id = result.insertId;
-            return init.then(() => votes.query(votesConstant.CREATE_VOTE), vote);
-        }, Promise.resolve());
-    })
-}
-
-// auth/index.js
-const passport = require('passport')
-    , LocalStrategy = require('passport-local').Strategy
-    , modelNames = require('../model').modelNames
-    , users = require('../model').getModel(modelNames.USERS_MODEL)
-    , userConstants = require('../model/users').constants;
-
-let init = function() {
-  passport.serializeUser((user, done) => {
-    done(null, user.id);
-  });
-
-  passport.deserializeUser(function(id, done) {    
-    users.query(userConstants.GET_USER_BY_ID, {id: id})
-    .then((user) => done(null, user));
-  });
-
-  passport.use(new LocalStrategy({
-      usernameField: 'email',
-      passwordField: 'password'
-    }, (email, password, done) => {
-
-      users.query(userConstants.GET_USER_BY_EMAIL, {email: email})
-      .then((user) => {
-        if (!user) {
-          return done(null, false, { message: 'Incorrect email or password.' });
-        }
-
-        users.validatePassword(user, password)
-          .then((isMatch) => {
-            isMatch ? 
-              done(null, user) : 
-              done(null, false, { message: 'Incorrect username or password'})
-          })
-          .catch(err => done(err));
-      })
-      .catch(err => done(err));
-  }));
-
-  return passport;
-};
-
-module.exports = init();
-
-// routes/user.js
-const router = require('express').Router()
-    , passport = require('passport')
-    , modelNames = require('../model').modelNames
-    , users = require('../model').getModel(modelNames.USERS_MODEL)
-    , userConstants = require('../model/users').constants;
-
-router.post('/register', (req, res) => {
-  const credentials = {
-    name: req.body.name,
-    email: req.body.email,
-    password: req.body.password
-  };
-
-  users.register(credentials)
-  .then((result) => res.status(201).json(JSON.stringify({userId: result.insertId})))
-  .catch((err) => {
-      if (err.message === constants.EMAIL_EXISTS)
-        res.status(409).json(JSON.stringify({message: constants.EMAIL_EXISTS})); 
-      else if// и т.д.
-      else
-        res.sendStatus(500);
-  });
-});
-
-router.post('/login', (req, res) => {
-  passport.authenticate('local', (err, user, info) => {
-    if (err) return next(err);
-
-    if (user) {
-      req.logIn(user, (err) => {
-        if (err) return next(err);
-
-        let userData = {
-          name: user.name,
-          email: user.email,
-          userId: user.id
-        };
-
-        res.status(200).json(JSON.stringify(userData));
-      });
-    } else {
-
-      res.sendStatus(401);
-    }
-  })(req, res, next);
-});
-
-router.get('/logout', (req, res) => {
-  req.logout();
-
-  req.session = null;
-
-  res.sendStatus(200);
-});
-
-router.get('/users', (req, res) => {
-   users.query(userConstants.GET_ALL_LIMITED_WITH_OFFSET, {
-       limit: req.body.limit, offset: req.body.offset
-    })
-   .then((result) => res.json(JSON.stringify({ users: result })));
-   .catch((err) => res.sendStatus(500));
-});
-
-router.get('/users/:id', (req, res) => {
-   users.query(userConstants.GET_USER_BY_ID, { id: req.body.id })
-   .then((result) => res.json(JSON.stringify(result)));
-   .catch((err) => res.sendStatus(500));
-});
-
-　
-module.exports = router;
+//models/votations/factory.js
+// добавить в запросы выборки по голосованиям поле craetedAt.
+case constants.GET_FULL_VOTATION_BY_ID:
+      return 'SELECT vtn.title, vtn.description, vtn.id votationId, vtn.creator_id creatorId, '
+           + 'vtn.created_at createdAt, vt.value, u.name, u.id userId FROM '
+           + 'votations vtn LEFT JOIN votes vt ON vtn.id = vt.votation_id '
+           + 'INNER JOIN users u ON vt.creator_id = u.id '
+           + 'WHERE vtn.id = ' + data.id + ';';
+case constants.FIND_VOTATIONS_WITH_VOTES_LIMITED_FROM_OFFSET:
+  return 'SELECT vtn.title, vtn.description, vtn.id votationId, vtn.creator_id creatorId, '
+       + 'vtn.created_at createdAt, vt.value, u.name, u.id userId FROM '
+       + 'votations vtn LEFT JOIN votes vt ON vtn.id = vt.votation_id '
+       + 'INNER JOIN users u ON vt.creator_id = u.id '
+       + 'WHERE MATCH (vtn.title,vtn.description) AGAINST (' + data.text + ') '
+       + 'ORDER BY vtn.created_at DESC '
+       + 'LIMIT ' + data.limit + ' OFFSET ' + data.offset + ';';              
 
 // routes/votation.js
 const router = require('express').Router()
     , passport = require('passport')
     , modelNames = require('../model').modelNames
     , votations = require('../model').getModel(modelNames.VOTATION_MODEL)
-    , votationsConstants = require('../model/votations').constants;
+    , votationsConstants = require('../model/votations').constants
+    , users = require('../model').getModel(modelNames.USERS_MODEL)
+    , usersConstants = require('../model/users').constants;
 
-router.post('/votations',  (req, res) => {
+router.post('/votations', users.isAuthenticated, (req, res) => {
    const votationData = req.body.votationData
        , votes = req.body.votes;
      
@@ -143,7 +34,7 @@ router.post('/votations',  (req, res) => {
       votationId = result.insertId;
 
       return votes.reduce((initial, vote) => {
-          vote.votation_id = result.insertId;
+          vote.votation_id = votationId;
           return initial.then(() => votes.query(votesConstant.CREATE_VOTE), vote);
       }, Promise.resolve());
    })
@@ -151,111 +42,148 @@ router.post('/votations',  (req, res) => {
    .catch((err) => res.sendStatus(500));
 });
 
-　
+// 
+router.get('/votations', users.isAuthenticated, (req, res) => {
+    votations.query(votationsConstants.GET_ALL_WITH_VOTES_LIMITED_BY_OFFSET, { 
+        limit: req.body.limit,
+        offset: req.body.offset
+    })
+    .then((result) => {
+      let combinedVotations = _combineVotesByVotations(result);
+      res.status(200).json(JSON.stringify(combinedVotations));
+    })
+    .catch((err) => res.sendStatus(500));
+});
+
+router.get('/votations/:id', users.isAuthenticated, (req, res) => {
+    const votationId = req.params.id;
+
+    votations.query(votationsConstants.GET_FULL_VOTATION_BY_ID, { id: votationId })
+    .then((result) => {
+        if (result.length === 0)
+            return res.sendStatus(404);
+
+        let votationData = {
+            title: result[0].title,
+            description: result[0].description,
+            creatorId: result[0].creatorId,
+            votationId: votationId,
+            createdAt: result[0].createdAt
+        };
+
+        let votes = result.map((item) => {
+            return { value: item.value, creatorId: item.userId, name: item.name };
+        });
+
+        res.status(200).json(JSON.stringify({
+            votationData: votationData,
+            votes: votes;
+        }));
+    })
+    .catch((err) => res.sendStatus(500));
+});
+
+router.get('/votations_search', (req, res) => {
+   votations.query(votationsConstants.FIND_VOTATIONS_WITH_VOTES_LIMITED_FROM_OFFSET, {
+       text: req.body.text, limit: req.body.limit, offset: req.body.offset
+   })
+   .then((result) => {
+      let combinedVotations = _combineVotesByVotations(result);
+      res.status(200).json(JSON.stringify(combinedVotations));
+   })
+   .catch((err) => res.sendStatus(500));
+});
+
+router.get('/votations_by_user', (req, res) => {
+   votations.query(votationsConstants.GET_USER_VOTATIONS_WITH_VOTES_LIMITED_FROM_OFFSET, {
+       creatorId: req.body.creatorId, limit: req.body.limit, offset: req.body.offset
+   })
+   .then((result) => {
+      let combinedVotations = _combineVotesByVotations(result);
+      res.status(200).json(JSON.stringify(combinedVotations));
+   })
+   .catch((err) => res.sendStatus(500));
+});
+
+router.delete('/votations/:id', (req,res) => {
+    votations.query(votationsConstants.DELETE_VOTATION_BY_ID, { id: req.params.id })
+    .then(() => res.sendStatus(201))
+    .catch((err) => res.sendStatus(500));
+});
+
+function _combineVotesByVotations(result) {
+  let lastVisitedVotationId = 0, combinedVotations = [];
+    
+  for(let i = lastVisitedVotationId; i < result.length; i++) { 
+    let item = result[i];
+
+    if (i !== 0 && item.votationId === result[i - 1].votationId)
+      continue;
+    else {
+      let votationData = {
+        title: item.title,
+        description: item.description,
+        votationId: item.votationId,
+        creatorId: item.creatorId,
+        createdAt: result[0].createdAt
+      }, votes = [];
+          
+      for (let j = i; j < result.length ; j++) {
+        lastVisitedVotationId = j;
+          
+        if (item.votationId !== result[j].votationId)
+          break;
+        else {
+          votes.push({
+            value: result[j].value,
+            creatorId: result[j].userId,
+            name: result[j].name
+          });
+        }
+      }
+          
+      combinedVotations.push({
+        votationData: votationData,
+        votes: votes
+      });
+    }
+  }
+  
+  return combinedVotations;
+}
+
+module.exports = router;
+
 //test/integration/user.test.js
-const chai = require('chai')
-    , chaiHttp = require('chai-http')
-    , server = require('../app/app.js')
-
-    , modelNames = require('../model').modelNames
-    , users = require('../model').getModel(modelNames.USERS_MODEL)
-    , userConstants = require('../model/users').constants
-    , expect = chai.expect
-    , should = chai.should();
-
-chai.use(chaiHttp);
-
 describe('User Routes', () => {
-  const userData = {
-    name: 'user',
-    email: 'user@email.com',
-    password: 'password'
-  },
-  userData2 = {
-    name: 'user2',
-    email: 'user2@email.com',
-    password: 'password'
-  };
-
-  let userId, userId2;
-
   beforeEach((done) => {
     users.query(userConstants.CLEAR_TABLE).then(() => done());
   });
 
-  describe('Register', () => {
-    it('should register new user', (done) => {
+  describe('login', () => {
+    before((done) => {
+        users.query(userConstants.CLEAR_TABLE)
+        .then(() => users.register(userData))
+        .then(() => done());
+    })
+
+    it('should login user', (done) => {
       chai.request(server)
-      .post('/register')
+      .post('/login')
       .send(userData)
       .end((err, res) => {
-        const body = JSON.parse(res.body);
-
-        expect(body).to.haveOwnProperty('userId');
-        res.should.have.status(201);
-        
-        userId = body.userId;
-
+        res.should.have.status(200);        
         done();
       });
     });
 
-　
-    it('should return user data for created user userId', (done) => {
-      const userPath = '/users/' + userId;
-
+    it('Should not login user with invalid credentials', () => {
       chai.request(server)
-      .get(userPath)
+      .post('/login')
+      .send({ email: 'invalid', password: 'invalid'})
       .end((err, res) => {
-        const body = JSON.parse(res.body);
-        
-        res.should.have.status(200);
-        expect(body.name).to.equal(userData.name);
-        expect(body.email).to.equal(userData.email);
-        expect(body.userId).to.equal(userId);
-        done();
+        res.should.have.status(401);
       });
     });
-  });
-
-  describe('Get users', () => {
-      it('should return all users limitied with offset', (done) => {
-        users.register(userData)
-        .then((result) => {
-            userId = result.insertId; 
-            return Promise.resolve();
-        })
-        .then(() => users.register(userData2))
-        .then((result) => {
-            userId2 = result.insertId; 
-            return Promise.resolve();
-        })
-        .then(() => chai.request(server))
-        .get('/users')
-        .send({ limit: 10, offset: 0 })
-        .end((err, res) => {
-            const body = JSON.parse(res.body);
-
-            res.should.have.status(200);
-            expect(body.users.length).to.equal(2);
-            done();
-        })
-      });
-
-      it('should return user by id', (done) => {
-          const userPath = '/users/' + userId;
-
-          chai.request(server)
-          .get(userPath)
-          .end((err, res) => {
-              const body = JSON.parse(res.body);
-        
-              res.should.have.status(200);
-              expect(body.name).to.equal(userData.name);
-              expect(body.email).to.equal(userData.email);
-              expect(body.userId).to.equal(userId);
-              done();
-          });
-      });
   });
 });
