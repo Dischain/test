@@ -1,80 +1,112 @@
-// ./stores/login.js
+// создать отдельные редьюсеры для authReducer, usersReducer, votationsReducer, currentVotationReducer
+// и для каждого из них прописать initialState
 
-let _user = {};
+　
+　
+// reducers/loginReducer.js
+import { 
+  SET_AUTH, 
+  CHANGE_LOGIN_FORM, 
+  SENDING_LOGIN_REQUEST,
+  SET_LOGIN_ERROR_MESSAGE
+} from '../constants/LoginConstants.js';
 
-LoginStore = Reflux.createStore({
-    init() {
-        this.listenTo(LoginAction.Login, 'onLogin');
-    },
+import auth from '../utils/auth';
 
-    fetchUser() {
-        let curUser = sessionStorage.getItem('user');
+const assign = Object.assign;
 
-        if (curUser) {
-            _user = JSON.parse(curUser);
-            this.trigger(_user);
-        } else {
-            this.trigger(null);  
-        }
-    },
-    
-    onLogin(userData) {
-        fetch.post('/login', userData)
-        .then((err, res) => {
-            if (res.status != 401){
-                _user = res.body;
-                sessionStorage.setItem('user', JSON.stringify(_user));
-                this.trigger(_user);
-            } else {
-                this.trigger(null);  
-            }
-        });
-    }
-});
+const initialState = {
+  loginFormState: {
+    email: '',
+    password: ''
+  },
+  sendingLoginRequest: false,
+  loginFormErrorMessage: '',
+  loggedIn: auth.loggedIn()
+};
 
-LoginStore.getUser = function() {
-    return sessionStorage.getItem('user');
+export function loginReducer(state = initialState, action) {
+  switch(action.type) {
+    case SET_AUTH: 
+      return assi({}, state, {
+        loggedIn: action.newState
+      });
+      break;
+    case CHANGE_LOGIN_FORM:
+      return assign({}, state, {
+        loginFormState: action.newState
+      });
+      break;
+    case SENDING_LOGIN_REQUEST:
+      return assign({}, state, {
+        sendingLoginRequest: action.newState
+      });
+      break;
+    case SET_LOGIN_ERROR_MESSAGE:
+      return assign({}, state, {
+        loginFormErrorMessage: action.newState
+      });
+      break;
+    default:
+      return state;
+  }
 }
 
-Layout = React.createClass({
-    mixins: [
-        Reflux.listenTo(LoginStore, 'onLogin')
-    ],
+// reducers/AuthReducer.js
+import { 
+  CHANGE_REGISTER_FORM, 
+  SENDING_REGISTER_REQUEST,
+  SET_REGISTER_ERROR_MESSAGE
+} from '../constants/RegisterConstants.js';
 
-    getInitialState() {
-        return { user: null };
-    },
+import auth from '../utils/auth';
 
-    onLogin(userData) {
-        this.setState({curUser: userData})
-    },
+const assign = Object.assign;
 
-    componentDidMount() {
-        LoginStore.fetchUser();
-    },
+const initialState = {
+  registerFormState: {
+    name: '',
+    email: '',
+    password1; '',
+    password2: '',
+    avatar: ''
+  },
+  sendingRegisterRequest: false,
+  registerFormErrorMessage: ''
+};
 
-    render() {
-        return (
-            <div>
-                <Menu user={this.state.user} />
-                {React.cloneElement(this.props.children), this.state}
-                <Footer />
-            </div>
-        );
-    }
-});
+export function registerReducer(state = initialState, action) {
+  switch(action.type) {
+    case CHANGE_REGISTER_FORM:
+      return assign({}, state, {
+        registerFormState: action.newState
+      });
+      break;
+    case SENDING_REGISTER_REQUEST:
+      return assign({}, state, {
+        sendingRegisterRequest: action.newState
+      });
+      break;
+    case SET_REGISTER_ERROR_MESSAGE:
+      return assign({}, state, {
+        registerFormErrorMessage: action.newState
+      });
+      break;
+    default:
+      return state;
+  }
+}
 
-const LoginComponent = React.createClass({
-    handleSubmit(event) {
-        if (this.validateForm(event.target.elements))
-            LoginAction.Login(event.target.elements);
-    },
+// actions/loginActions.js
+import { 
+  SET_AUTH, 
+  CHANGE_LOGIN_FORM, 
+  SENDING_LOGIN_REQUEST,
+  SET_LOGIN_ERROR_MESSAGE
+} from '../constants/LoginConstants.js';
 
-    render() {
-        return (
-            <form action='post' path='./login'>
-                <submit onSubmit={this.handleSubmit}>login</submit>
-            </form>
-        );
-    }
-});
+import auth from '../utils/auth';
+
+export function login(email, password) {
+  
+}
