@@ -1,34 +1,120 @@
-// сначала протестировать endpoints на корректный возврат ошибок авторизации
-// найти токен после логина
+'use strict';
 
-//actions/AppActions.js
-import { CHANGE_FORM, SENDING_REQUEST, SET_ERROR_MESSAGE } from '../constants/AppConstants';
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
 
-export function sendingRequest(sending) {
-  return { type: SENDING_REQUEST, sending };
+import ControlledInput from '../ControlledInput.js';
+import LoadingButton from '../LoadingButton.js';
+import { 
+  changeFrom,
+  setRegisterFormIsValid,
+  setRegisterFormErrorMessages
+} from '../../actions/registerActions.js';
+
+const assign = Object.assign
+
+// TODO: avatar upload
+class RegisterPage extends Component {
+  render() {
+    let submitBtn;
+
+    if (!this.props.isRegisterFormValid) {
+      submitBtn = 
+      <button className = 'form__submit-btn' type = 'submit'>Send</button>
+    } else if (this.props.sendingRegisterRequest) {
+      submitBtn = <LoadingButton btnText = {'Send'}/>
+    } else {
+      submitBtn = 
+      <button className="form__submit-btn form__submit-btn_active" type="submit">Send</button>
+    }
+
+    return (
+      <div className = 'form-page__wrapper'>        
+        <div className='form-page__form-wrapper'>
+          <div className='form-page__form-header'>
+            <h2 className='form-page__form-heading'>Login</h2>
+          </div>
+
+          <div className = 'form' onSubmit = {this._onSubmit.bind(this)}> //new
+            <ControlledInput formId = {'name'}
+              fieldName = {'Name'}
+              type = {'text'}
+              value = {this.props.registerFormState.name}
+              placeholder = {'Enter Your Name'}
+              onChange = {this._onChangeName.bind(this)}
+              errorMessage = {this.props.registerFormErrorMessages.name}
+            />
+            <ControlledInput formId = {'email'}
+              fieldName = {'Email'}
+              type = {'text'}
+              value = {this.props.registerFormState.email}
+              placeholder = {'Enter Your Email'}
+              onChange = {this._onChangeEmail.bind(this)}
+              errorMessage = {this.props.registerFormErrorMessages.email}
+            />
+            <ControlledInput formId = {'password1'}
+              fieldName = {'Password'}
+              type = {'password'}
+              value = {this.props.registerFormState.password1} 
+              onChange = {this._onChangePassword1.bind(this)}
+              errorMessage = {this.props.registerFormErrorMessages.password2}
+            />
+            <ControlledInput formId = {'password2'}
+              fieldName = {'Confirm Password'}
+              type = {'password'}
+              value = {this.props.registerFormState.password1}
+              onChange = {this._onChangePassword2.bind(this)}
+              errorMessage = {this.props.registerFormErrorMessages.password2}
+            />
+            <div className = 'form__submit-btn-wrapper'> //
+              {submitBtn} //
+            </div> //
+          </div>          
+          
+          <div className='form-page__form-footer'> //
+            <div className='form-page__form-error'>{this.props.registerError}</div> //
+          </div> //
+        </div>
+      </div>
+    );
+  }
+
+  // new + в registerReducer убать валидацию и правильно описать поля в отправляемом через fetch body.
+  _onSubmit(event) {
+    event.preventDefault();
+    if (this.props.isRegisterFormValid) {
+      this.props.dispatch(this.props.register({
+        this.props.registerFormState.name,
+        this.props.registerFormState.email,
+        this.props.registerFormState.password2,
+        this.props.registerFormState.avatar
+      }));
+    }
+  }
 }
 
-export function setErrorMessage(message) {
-  return { type: SET_ERROR_MESSAGE, message};
+// new
+function mapDispatchToProps(dispatch) {
+  return {
+    login: dispatch.register;
+  }
 }
 
-// utils/validateForm.js
-// utils/auth.js
-import { API_BASE_PATH } from '../constants/AppConstants';
+// new
+export function register(userData) {
+  return (dispatch, getState) => {
+    dispatch(sendingRegisterRequest(true));
 
-const authErrors = {
-  INVALID_EMAIL: 'invalid email',
-  INVALID_PASSWORD: 'invalid password'
-};
+    let { isRegisterFormValid } = getState();
 
-export authErrors;
+    if (!isRegisterFormValid) {
+      dispatch(sendingRegisterRequest(false));
+      return;
+    }
 
-export default auth = {
-  login: (email, password) => {
-    if (this.loggedIn())
-      return Promise.resolve(true);
+    let _status;
 
-    return fetch(API_BASE_PATH + '/login', {
+    return fetch(API_BASE_PATH + '/register', {
       headers: {
         'Accept': 'application/json, text/plain, */*',
         'Content-Type': 'application/json'
@@ -36,45 +122,34 @@ export default auth = {
       mode: 'cors',
       method: 'POST',
       credentials: 'include',
-      body: JSON.stringify({ email: email, password: password })
+      body: JSON.stringify({ 
+        name: userData.name,
+        email: userData.email, 
+        password: userData.password,
+        avatart: userData.avatart 
+      })
     })
     .then((res) => {
-      if (res.status === 200) {
-          return res.json();
-      } else {
-          // проверить, куда сообщения попадают при 401
-      }
+      _status = res.status;
+      return res.json();
     })
-    .then((json) => { // { name: user.name, email: user.email, avatar: user.avatar, userId: user.id };
-        let user = JSON.parse(json);
-        sessionStorage.setItem('token', /*res должен передать токен*/)
-        return Promise.resolve(user);
+    .then((json) => {
+      let data = JSON.parse(json);
+      if (_status === 201) {
+        dispatch(setRegisterError(''))
+        browserHistory.push('/login');
+      } else if (_status === 409) {
+        dispatch(setRegisterError(data.message));
+      } else {
+        dispatch(setRegisterError(commonErrors.ERROR));
+      }
+      dispatch(sendingRegisterRequest(false));
     })
     .catch((err) => {
-        throw err;
+      dispatch(setRegisterError(commonErrors.ERROR));
+      dispatch(sendingRegisterRequest(false));
     });
   }
 }
 
-// actions/AuthActions.js
-'use strict';
-import { browserHistory } from 'react-router';
-import { sendingRequest, setErrorMessage } from './AppActions.js';
-import auth, { authErrors } from '../utils/auth.js';
-
-// валидацию форм выполнять до отправки запроса
-export function login(email, password) {
-  return (discpatch) => {
-    discpatch(sendingRequest(true));
-    
-    auth.login(email, password)
-    .then((user) => {
-      dispatch(sendingRequest(false));
-
-      if (user) {
-          browserHistory.push('/dashboard');
-      }
-    })
-    .catch((err) => discpatch(setErrorMessage(err.message)) );
-  }
-}
+export default connect(mapStateToProps, mapDispatchToProps)(RegisterPage);
