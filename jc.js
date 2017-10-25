@@ -7,7 +7,11 @@ const httpServer = require('http').Server
     , users = require('../model').getModel(modelNames.USERS_MODEL)
     , userConstants = require('../model/users').constants
     , votes = require('../model').getModel(modelNames.VOTES_MODEL)
-    , votesConstants = require('../model/votes').constants;
+    , votesConstants = require('../model/votes').constants
+
+    , cache = require('../cache').votationCache
+
+    , assign = Object.assign;
 
 function ioEvents(io) {
   io.on('connection', (socket) => {
@@ -23,9 +27,14 @@ function ioEvents(io) {
       votations.query(votationsConstants.CREATE_VOTATION, votationData)
       .then((votationId) => {
         // сохранить id временного голосования
-        // ...
-        // оповестить создателя об успешном создании комнаты
-        socket.emit('VOTATION_CREATED', votationId);
+        cache.storeVotation(assign({}, votationData, { id: votationId }))
+        .then(() => {
+          // оповестить создателя об успешном создании комнаты
+          socket.emit('VOTATION_CREATED', votationId);
+        })
+        .catch((err) => {
+          socket.emit('VOTATION_CREATATION_ERROR');
+        })        
       })
       .catch((err) => {
         socket.emit('VOTATION_CREATATION_ERROR');
@@ -34,41 +43,75 @@ function ioEvents(io) {
   });
 
   io.of('/votationRoom').on('connection', (socket) => {
-    socket.on('join', (votationId) => {
+    socket.on('join', (votationId, userId) => {
       // если в кэше нет голосования с таким votationId, return
-      // ...
-      // помещаем пользователя, зашедшего в данное голосование, в кеш
-      // ...
-      // присоединяем его к комнате
-      socket.join(votationId);
+      return cache.containsVotation(votationId)
+      .then((contains) => {
+        if (!contains) return throw new Error('VOTATION_NOT_EXISTS');
+        return Promise.resolve();        
+      })
+      .then(() => {
+        // помещаем пользователя, зашедшего в данное голосование, в кеш
+        return cache.storeUserByVotation(votationId, userId);
+      })
+      .then(() => {
+        // присоединяем его к комнате
+        return new Promise((resolve, reject) => {
+          socket.join(votationId, (err) => {
+            if (err) return reject(err);
+            resolve();
+          });
+        });
+      })
       // вытаскиваем всех пользователей, зашедших в эту комнату, из кеша
-      // ... -> users
+      .then(() => return getusersByVotation(votationId))
       // обновляем список участников голосования
-      socket.emit('UPDATE_PARTICIPANTS', users)
+      .then((users) => {
+        socket.to(votationId).emit('UPDATE_PARTICIPANTS', users)
+      })
+      .catch((err) => {
+        if (err.message === 'VOTATION_NOT_EXISTS')
+          socket.emit('VOTATION_CONNECTION_ERROR');
+      });
     });
 
     socket.on('disconnect', (userId, votationId) => {
       // удаляем из кеша пользователя с таким userId
-      // ...
-      // покидаем комнату с таким votationId
-      socket.leave(votationId);
-      // оповещаем остальных, что usesrId их покинул
-      socket.broadcast.to(votationId).emit('REMOVE_USER', userId);
+      cache.removeUserFromVotation(userId, votationId)
+      .then(() => {
+        // покидаем комнату с таким votationId
+        return new Promise((resolve, reject) => {
+          socket.leave(votationId, (err) => {
+            if (err) return reject(err);
+            resolve();
+          });
+        });
+      })
+      .then(() => {
+        // оповещаем остальных, что usesrId их покинул
+        socket.to(votationId).emit('REMOVE_USER', userId);
+      })
+      .catch((err) => {
+        socket.emit('VOTATION_DISCONNECTION_ERROR');
+      });
     });
 
     socket.on('invite', ({ creatorId, votationId, title, description, users }) => {
       // высылаем голосование от имени создателя, с указанием инфо и id голосования
       // указанным в массиве users пользователям
       users.forEach((user) => {
-        socket.broadcast.emit('INVITE_USER', { creatorId, votationId, title, description });
-      });      
+        socket.to(votationId).emit('INVITE_USER', { creatorId, votationId, title, description });
+      });
     });
 
-    socket.on('send_vote', ({ votationCreatorId, creatorId, value }) => {
+    // voteData должен иметь поле creatorId (своего id пока еще не имеет). Учесть это в cache.storeVote
+    socket.on('send_vote', (voteData) => {
       // сохранить value в редис до завершения голосования
-      // ...
+      cache.storeVote(voteData)
+      // привяжем голос к голосованию
+      .then(() => cache.storeVoteByVotation(vote.votationId, vote.creatorId))
       // посылает окончательный результат голосования на creatorId (можно отпр. только раз)
-      socket.broadcast.emit('ADD_VOTE');
+      .then(() => socket.to(voteData.votationId).emit('ADD_VOTE', voteData));
     });
 
     socket.on('save_votation', (votationData) => {
@@ -78,6 +121,7 @@ function ioEvents(io) {
       // ...
       // закрываем комнату
       socket.broadcast.to(votationId).emit('CLOSE_VOTATION');
+      // чистим кеш
     });
   });
 }
