@@ -1,183 +1,115 @@
- /*                     Votes - Votations
-  ***************************************************************/
-    storeVote: function(voteData) {
-      const key = 'vote:' + voteData.creator_id; // <---------
-      return new Promise((resolve, reject) => {
-        con.hmset(key, voteData, (err) => {
-          if (err) return reject(err);
-          return resolve();
-        });
-      });      
-    },
+// в SocketClient:
+connect(query) {
+  let host = this.host + (query ? query : '');
+  this.socket = io.connect(host, { transports: ['websocket'] });
+  // ...
+}
 
-    getVote: function(creator_id) {
-      const key = 'vote:' + creator_id;
-      return new Promise((resolve, reject) => {
-        con.hgetall(key, (err, res) => {
-          if (err) return reject(err);
-          return resolve(res);
-        });
-      });  
-    },
+// ./ws/votationSocket.js
+import SocketClient from './SocketClient.js';
 
-    removeVote: function(creator_id, fields) {
-      const key = 'vote:' + creator_id;
-      return new Promise((resolve, reject) => {
-        con.hdel(key, fields, (err, numDeleted) => {
-          if (err) return reject(err);
-          return resolve(numDeleted);
-        });
-      });
-    },
+let socket = new SocketClient('/votations', );
 
-    storeVoteByVotation: function(votationId, voteId) {
-      const key = 'votation:' + votationId + ':votes';
-      return new Promise((resolve, reject) => {        
-        con.sadd(key, voteId, (err, res) => {
-          if (err) return reject(err);
-          return resolve(res);
-        });
-      });
-    },    
+socket.on('VOTATION_CREATED', (votationId) => { //dispatch выставляется в middleware
+  socket.dispatch(setNewlyCreatedVotationId(votationId));
+});
 
-    getVotesByVotation: function(votationId) {
-      const key = 'votation:' + votationId + ':votes';
-      return new Promise((resolve, reject) => {
-        con.smembers(key, (err, res) => {
-          if (err) return reject(err);
-          
-          let votes = [];
+// ./actions/socketVotationActions.js
+import { CREATE_VOTATION, SET_NEWLY_CREATED_VOTATION_ID } from '../constants/socketVotationConstants.js';
 
-          res.reduce((init, creator_id) => {
-            return init.then(() => {
-              return this.getVote(creator_id).then((res) => {
-                votes.push(res);
-                return Promise.resolve();              
-              });
-            })            
-          }, Promise.resolve())
-          .then(() => {
-            return resolve(votes);
-          })          
-        });
-      });
-    },   
-    
-    removeAllVotesByVotation: function(votationId) {
-      const key = 'votation:' + votationId + ':votes';
-      return new Promise((resolve, reject) => {
-        con.smembers(key, (err, res) => {
-          if (err) return reject(err);
-          
-          res.reduce((init, creator_id) => {
-            return init.then(() => this.removeVote(creator_id, Object.keys({ value, creator_id, votation_id})))            
-          }, Promise.resolve())
-          .then(() => {
-            return resolve(votes);
-          })          
-        });
-      });
-    },
+let useSocket = true, nsp = 'votations';
 
-    removeVoteByVotation: function(votationId, voteId) {
-      const key = 'votation:' + votationId + ':votes';
-      return new Promise((resolve, reject) => {
-        con.srem(key, voteId, (err, numRemoved) => {
-          if (err) return reject(err);
-          return resolve(numRemoved);
-        });
-      });
-    }
-/*************************************************************************/
+export function createVotation(votationData) {
+  return {
+    useSocket,
+    nsp, 
+    type: CREATE_VOTATION, 
+    promise: (socket) => socket.emit(CREATE_VOTATION, votationData)   
+  };
+}
 
-      // как отправить сообщение конкретному сокету?
-      // vote должен храниться по id создателя, а не голосования, т.к. своего айди покa не имеет
-      socket.on('send_vote', (voteData) => {
-        // сохранить value в редис до завершения голосования
-        cache.storeVote(voteData)
-        // привяжем голос к голосованию
-        .then(() => cache.storeVoteByVotation(vote.votationId, vote.creatorId))
-        // посылает окончательный результат голосования на creatorId (можно отпр. только раз)
-        .then(() => socket.to(voteData.votationId).emit('ADD_VOTE', voteData));
-      });
-  
-      socket.on('save_votation', (votationData) => {
-        // вытаскивает временные значения голосов из redis
-        cache.getVotesByVotation(votationData.id)
-        .then((votes) => {
-        // и сохраняем готовое голосование с результатами в бд
-          return votesData.reduce((initial, vote) => {
-            vote.votation_id = votationData.id;
-            return initial.then(() => votes.query(votesConstants.CREATE_VOTE, vote));
-          }, Promise.resolve());
-        })
-        // затираем кеш
-        .then(() => cache.removeVotation(votationData.id, Object.keys(votationData))
-        .then(() => cache.removeAllVotesByVotation(votationData.id)) // дописать
-        .then(() => cache.removeAllUserFromVotation(votationData.id)) // дописать
-        .then(() => {
-        // закрываем комнату
-          socket.broadcast.to(votationId).emit('CLOSE_VOTATION');
-        })
-        .catch((err) => {          
-          votations.query(votationsConstants.DELETE_VOTATION, votationData.id)
-          .then(() => socket.emit('VOTATION_SAVING_ERROR'))          
-        })
-      });
-    });
-
-// после успешного создания комнаты клиент должен перейти в соотв. пространство имен
-
-describe('votationRoom namespace', () => {
-    const 
-    votation1 = {
-      title: 'test title',
-      description: 'test desc',
-      creator_id: '1'
-    },
-    user1 = {
-      name: 'user1',
-      id: '1'
-    }, 
-    user2 = {
-      name: 'user2',
-      id: '2'
+export function setNewlyCreatedVotationId(votationId) {
+    return {
+        type: SET_NEWLY_CREATED_VOTATION_ID,
+        votationId
     };
-    let client1, client2, votationId;
-    // before:
-    // 1. Создать объект голосования и поместить его в редис
-    // 2. Создать объект юзера
-    // socket.emit('join', roomId);
-    before((done) => {
-      client1 = io.connect(
-        'http://localhost:3001/votations',
-        { transports: ['websocket'] });
-      client1.on('connect', () => {
-        client1.emit('CREATE_VOTATION', votation1);
+}
 
-        client1.on('VOTATION_CREATED', (id) => {
-          votationId = id;          
-          done();
-        });
-     });
-    });
+// ./actions/socketVotationRoomActions.js
+import { JOIN, INVITE, SEND_VOTE, SAVE_VOTATION } from '../constants/socketVotationRoomConstants.js';
 
-    after(() => {
-      flush().then(done);
-    });
+let useSocket = true, nsp = 'votationRoom';
 
-    it('should update list of participants after joininig votation room', (done) => {       
-      client1 = io.connect(
-        'http://localhost:3001/votationRoom',
-        { transports: ['websocket'] }),
+// { votationId, userId, cretorId }
+export function joinVotation(votationData) {
+  return {
+    useSocket,
+    nsp, 
+    type: JOIN, 
+    promise: (socket) => socket.emit(JOIN, votationData)   
+  };
+}
 
-      client1.on('connect', () => {
-        client1.on('UPDATE_PARTICIPANTS', (users) => {
-          console.log(users);
-          done();
-        });
-        
-        client1.emit('join', votationId);
+export function inviteToVotation(data) {
+  return {
+    useSocket,
+    nsp, 
+    type: INVITE, 
+    promise: (socket) => socket.emit(INVITE, votationData)   
+  };
+}
+
+export function sendVote(data) {
+  return {
+    useSocket,
+    nsp, 
+    type: SEND_VOTE, 
+    promise: (socket) => socket.emit(SEND_VOTE, votationData)   
+  };
+}
+
+export function saveVotation(data) {
+  return {
+    useSocket,
+    nsp, 
+    type: SAVE_VOTATION, 
+    promise: (socket) => socket.emit(SAVE_VOTATION, votationData)   
+  };
+}
+
+// ./middleware/ws.js
+export default function socketMiddleware(sockets) {
+  return ({ dispatch, getState }) => next => action => {
+    if (typeof action === 'function') {
+      return action(dispatch, getState);
+    }
+
+    const { useSocket, nsp, type, promise, ...rest } = action;
+
+    let socket = sockets[nsp];
+
+    if (!useSocket) {
+      return next(action);
+    }
+
+    if (!socket.dispatch) socket.dispatch = dispatch;
+
+    return promise(socket)
+      .then((result) => {
+        return next({ ...rest, result, type }) // тут включается редьюсер и изменяет состояние
+                                               // в соотв. с указанным типом.
       });
-    });
-  });
+  }
+}
+
+// in component:
+// import { someAction } from socketActions.js;
+// ...
+// dispatch(someAction(someData));
+// ...
+// function mapDispatchToProps(dispatch) {
+//   return {
+//     dispatch: func => dispatch(func),
+//     someAction: 
+//   };
+// }
