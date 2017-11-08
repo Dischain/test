@@ -9,6 +9,10 @@
       text-decoration: none;
       background-color: transparent;
     }
+    .fixed-left {
+      position: fixed;
+      top: 24px;      
+    }
     .clearfix:after {
       display: block;
       clear: both;
@@ -16,6 +20,9 @@
     }
     .float-left {
       float: left !important;
+    }
+    .float-right {
+      float: right !important;
     }
     .position-relative {
       position: relative !important;
@@ -25,6 +32,9 @@
     }
     .display-table {
       display: table !important;
+    }
+    .display-inline {
+      display: inline !important;
     }
     .display-block {
       display: block !important;
@@ -49,15 +59,16 @@
       display: inline-block;
       overflow: hidden;
       vertical-align: middle;
-      width: 100%;
+      background-size: 214px 214px;      
     }
     .u-name {
       font-size: 26px;
       line-height: 30px;
       padding-top: 16px;
-      padding-bottom: 16px;
+      padding-bottom: 16px;      
     }
     .u-details {
+      width: 100%;
       border-top: 1px #e1e4e8 solid;
     }
     .u-details__email {
@@ -127,13 +138,59 @@
     .votation-data__votes {
       display: inline-block;
       margin-top: 8px;
+      max-width: 240px;
+    }
+    .vote-sm {
+      display: inline-block;
+      padding: 5px;
+      margin-right: 5px;
+      margin-bottom: 10px;
+      border-radius: 2px;
+      border: 1px solid #e1e4e8;
+      background-color: transparent;
+    }
+
+    .user-card {
+      padding-top: 15px;
+      padding-bottom: 15px;
+      width: 100%;
+      border-bottom: 1px #e1e4e8 solid;        
+    }
+    .user-card__avatar {
+      background-size: 75px 75px;
+    }
+    .user-card__name {
+      margin-left: 15px;      
+      word-wrap: break-word;
+    }
+
+    .user-info {
+      padding: 5px;
+      color: #6a737c;
+      width: 200px;
+      box-sizing: border-box;
+      background-color: #E0EAF1;
+    }
+    .user-info__date {
+      margin-top: 1px;
+      margin-bottom: 4px;
+      font-size: 12px;
+      text-decoration: none;
+    }
+    .user-info__avatar {
+      background-size: 50px 50px;
+    }
+    .user-info__name {
+      margin-left: 8px;
+      line-height: 17px;
+      word-wrap: breal-word;
     }
   </style>
 </head>
 <body>
   <div class="container clearfix">
     <div class="side-bar float-left">
-      <img class="u-avatar" src="./ava.png" width="230" height="230"></img>
+      <img class="u-avatar" src="./ava.png" width="214" height="214"></img>
       <div class="u-name"><span>Username</span></div>
       <div class="u-details">
         <span class="u-details__email"><a href="mailto:sano@i.ua">sano@i.ua</a></span>
@@ -160,9 +217,37 @@
               <div class="votation-data__desc text-gray"
                 <p>Some looong votations description...</p>
               </div>
-              <div class="votation-data__votes">
-                
-              </div> 
+              <div class="clearfix">
+                <div class="votation-data__votes float-left">
+                  <div class="vote-sm">5</div>
+                  <div class="vote-sm">5</div>
+                  <div class="vote-sm">5</div>
+                  <div class="vote-sm">5</div>
+                  <div class="vote-sm">5</div>
+                  <div class="vote-sm">5</div>
+                  <div class="vote-sm">5</div>
+                  <div class="vote-sm">5</div>
+                  <div class="vote-sm">5</div>
+                  <div class="vote-sm">5</div>
+                  <div class="vote-sm">5</div>
+                  <div class="vote-sm">5</div>
+                </div>
+                <div  class="user-info float-right clearfix">
+                  <div class="user-info__date">created
+                    <span>Nov 22 at 15:00</span>
+                  </div>
+                  <img class="user-info__avatar float-left" src="./ava.png" width="50" height="50"></img>                  
+                  <div class="user-info__name float-left">
+                    <a href="#">Dischain</a>
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li class="user-card clearfix display-block">
+              <img class="user-card__avatar float-left" src="./ava.png" width="75" height="75"></img>                  
+              <div class="user-card__name float-left">
+                <a href="#">Dischain</a>
+              </div>
             </li>
           </ul>
         </div>
