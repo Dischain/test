@@ -101,19 +101,41 @@
       background-color: #fff;
       background-repeat: no-repeat;
       background-position: right 8px center;
-      border: 1px solid #d1d5da;
-
+      border: 1px solid #6CC0E5;
+      background: transparent;
+      border-radius: 3px;
     }
     .votations-select {
-
+      border: 1px solid #6CC0E5;
+      background: transparent;
+      border-radius: 3px;
+      width: auto;
+      padding: 5px 35px 5px 5px;
+      font-size: 16px;
+      height: 34px;
     }
-    .votations-filter__search-box {
+    .votations-btn {
+      padding: 7px;
+      margin-left: 16px;
+      color: #6CC0E5;
+      border: 1px solid #6CC0E5;
+      border-radius: 3px;
+      text-decoration: none;
+      user-select: none;
+      display: inline-block;
+    }
+    .votations-btn:hover {
+      color: white;
+      background-color: #6CC0E5;
+    }
+
+    .search-box {
       padding-right: 24px;
       width: 99%;
       display: table-cell;
       white-space: nowrap;
     }
-    .votations-filter__filter {
+    .filter {
       display: table-cell;
       width: 1%;
       position: relative;
@@ -185,6 +207,32 @@
       line-height: 17px;
       word-wrap: breal-word;
     }
+    .inputfile {
+      width: 0.1px;
+      height: 0.1px;
+      opacity: 0;
+      overflow: hidden;
+      position: absolute;
+      z-index: -1;      
+    }
+    .inputfile + label {
+      padding: 7px;
+      margin-left: 16px;
+      color: #6CC0E5;
+      border: 1px solid #6CC0E5;
+      border-radius: 3px;
+      text-decoration: none;
+      user-select: none;
+      display: inline-block;
+    }
+    .inputfile:focus + label,
+    .inputfile + label:hover {
+      color: white;
+      background-color: #6CC0E5;
+    }
+    .inputfile + label {
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -200,12 +248,16 @@
       <div class="position-relative">
         <div class="votations-filter">
           <form class="display-table">
-            <div class="votations-filter__search-box">
+            <div class="search-box">
               <input class="votations-input" type="search" placeholder="Search votations..." autocomplete="off"></input>
             </div>
-            <div class="votations-filter__filter text-right">
-              <select class="votations-select"></select>
-            </div>
+            <div class="filter text-right">
+              <select class="votations-select">
+                <option value="volvo">Volvo</option>
+                <option value="Skoda">Skoda</option>
+              </select>              
+              <a class="votations-btn">New</a>
+            </div>            
           </form>
         </div>
         <div class="votations-list">
@@ -219,15 +271,6 @@
               </div>
               <div class="clearfix">
                 <div class="votation-data__votes float-left">
-                  <div class="vote-sm">5</div>
-                  <div class="vote-sm">5</div>
-                  <div class="vote-sm">5</div>
-                  <div class="vote-sm">5</div>
-                  <div class="vote-sm">5</div>
-                  <div class="vote-sm">5</div>
-                  <div class="vote-sm">5</div>
-                  <div class="vote-sm">5</div>
-                  <div class="vote-sm">5</div>
                   <div class="vote-sm">5</div>
                   <div class="vote-sm">5</div>
                   <div class="vote-sm">5</div>
@@ -248,6 +291,9 @@
               <div class="user-card__name float-left">
                 <a href="#">Dischain</a>
               </div>
+            <li class="user-card clearfix display-block">
+              <input type="file" name="file" id="file" class="inputfile" />
+              <label for="file">Choose a file</label>
             </li>
           </ul>
         </div>
