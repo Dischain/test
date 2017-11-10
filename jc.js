@@ -1,244 +1,273 @@
-const httpServer = require('http').Server
-	, ws = require('socket.io')
+import { 
+  getVotations, 
+  getUserVotations, 
+  searchVotations 
+} from '../actions/votationsActions.js';
+import { searchUsers } from '../actions/userActions.js';
+// import { setCurView, setPaginationOffset } from '../actions/dataListActions.js';
+import { 
+  DEFAULT_PAGINATION_OFFSET, 
+  DEFAULT_PAGINATION_LIMIT 
+} from '../constants/commonConstants.js';
+import {
+  DATA_LIST_VOTATIONS_VIEW,
+  DATA_LIST_USER_VOTATIONS_VIEW,
+  DATA_LIST_VOTATIONS_SEARCH_VIEW,
+  DATA_LIST_USERS_SEARCH_VIEW
+} from '../constants/dataListConstants.js'
 
-	, modelNames = require('../model').modelNames
-    , votations = require('../model').getModel(modelNames.VOTATIONS_MODEL)
-    , votationsConstants = require('../model/votations').constants
-    , users = require('../model').getModel(modelNames.USERS_MODEL)
-    , userConstants = require('../model/users').constants
-    , votes = require('../model').getModel(modelNames.VOTES_MODEL)
-    , votesConstants = require('../model/votes').constants
+class DataList extends  Component {
+  componentDidMount() {
+    const { 
+      location, getVotations, getUserVotations,
+      setCurView, setPaginationOffset,
+      currentPaginationOffset
+    } = this.props;
 
-    , cache = require('../cache').votationCache
-
-    , assign = Object.assign;
-
-function ioEvents(io) {
-  io.on('connection', (socket) => {
-    // обновить список юзеров онлайн
-    // поместить в кеш, что юзер онлайн
-  });
-  io.on('disconnect', (socket) => {
-    // обновить список юзеров онлайн
-    // поместить в кеш, что юзер офлайн
-  });
-  io.of('/votations').on('connection', (socket) => {
-    socket.on('CREATE_VOTATION', (votationData) => {
-      votations.query(votationsConstants.CREATE_VOTATION, votationData)
-      .then((votationId) => {
-        // сохранить id временного голосования
-        cache.storeVotation(assign({}, votationData, { id: votationId }))
-        .then(() => {
-          // оповестить создателя об успешном создании комнаты
-          socket.emit('VOTATION_CREATED', votationId);
-        })
-        .catch((err) => {
-          socket.emit('VOTATION_CREATATION_ERROR');
-        })        
-      })
-      .catch((err) => {
-        socket.emit('VOTATION_CREATATION_ERROR');
+    if (location === '/dashboard') {
+      //setCurView(DATA_LIST_VOTATIONS_VIEW);      
+      getVotations({ 
+        offset: DEFAULT_PAGINATION_OFFSET, 
+        limit: DEFAULT_PAGINATION_LIMIT
       });
-    });
-  });
+    } else if (/users\/[0-9]+/.test(location)) {
+      let userId = Number.parseInt(location.split('/')[2]);
 
-  io.of('/votationRoom').on('connection', (socket) => {
-    socket.on('join', (votationId, userId) => {
-      // если в кэше нет голосования с таким votationId, return
-      return cache.containsVotation(votationId)
-      .then((contains) => {
-        if (!contains) return throw new Error('VOTATION_NOT_EXISTS');
-        return Promise.resolve();        
-      })
-      .then(() => {
-        // помещаем пользователя, зашедшего в данное голосование, в кеш
-        return cache.storeUserByVotation(votationId, userId);
-      })
-      .then(() => {
-        // присоединяем его к комнате
-        return new Promise((resolve, reject) => {
-          socket.join(votationId, (err) => {
-            if (err) return reject(err);
-            resolve();
-          });
+      //setCurView(DATA_LIST_USER_VOTATIONS_VIEW);
+      getUserVotations({
+        offset: DEFAULT_PAGINATION_OFFSET, 
+        limit: DEFAULT_PAGINATION_LIMIT, 
+        userId 
+      });
+    }
+
+    //setPaginationOffset(currentPaginationOffset + DEFAULT_PAGINATION_OFFSET);
+  }
+
+  render() {
+    const { currentView, currentViewData } = this.props;
+    return(
+      let dataList;
+      if (currentView === DATA_LIST_VOTATIONS_VIEW ||
+          currentView === DATA_LIST_USER_VOTATIONS_VIEW ||
+          currentView === DATA_LIST_VOTATIONS_SEARCH_VIEW) {
+      
+        datalist = currentViewData.map((item) => {
+          return <VotationCard />
         });
-      })
-      // вытаскиваем всех пользователей, зашедших в эту комнату, из кеша
-      .then(() => return getusersByVotation(votationId))
-      // обновляем список участников голосования
-      .then((users) => {
-        socket.to(votationId).emit('UPDATE_PARTICIPANTS', users)
-      })
-      .catch((err) => {
-        if (err.message === 'VOTATION_NOT_EXISTS')
-          socket.emit('VOTATION_CONNECTION_ERROR');
-      });
-    });
-
-    socket.on('disconnect', (userId, votationId) => {
-      // удаляем из кеша пользователя с таким userId
-      cache.removeUserFromVotation(userId, votationId)
-      .then(() => {
-        // покидаем комнату с таким votationId
-        return new Promise((resolve, reject) => {
-          socket.leave(votationId, (err) => {
-            if (err) return reject(err);
-            resolve();
-          });
+      } else if (currentView === DATA_LIST_USERS_SEARCH_VIEW) {
+        dataList = currentViewData.map((item) => {
+          return <UserCard />
         });
-      })
-      .then(() => {
-        // оповещаем остальных, что usesrId их покинул
-        socket.to(votationId).emit('REMOVE_USER', userId);
-      })
-      .catch((err) => {
-        socket.emit('VOTATION_DISCONNECTION_ERROR');
-      });
-    });
+      }
+    );
+  }
 
-    socket.on('invite', ({ creatorId, votationId, title, description, users }) => {
-      // высылаем голосование от имени создателя, с указанием инфо и id голосования
-      // указанным в массиве users пользователям
-      users.forEach((user) => {
-        socket.to(votationId).emit('INVITE_USER', { creatorId, votationId, title, description });
-      });
-    });
+  _onScroll(event) {
+    const { currentPaginationOffset, currentView } = this.props;
 
-    // voteData должен иметь поле creatorId (своего id пока еще не имеет). Учесть это в cache.storeVote
-    socket.on('send_vote', (voteData) => {
-      // сохранить value в редис до завершения голосования
-      cache.storeVote(voteData)
-      // привяжем голос к голосованию
-      .then(() => cache.storeVoteByVotation(vote.votationId, vote.creatorId))
-      // посылает окончательный результат голосования на creatorId (можно отпр. только раз)
-      .then(() => socket.to(voteData.votationId).emit('ADD_VOTE', voteData));
-    });
+    let userId;
+    if (currentView === DATA_LIST_USER_VOTATIONS_VIEW) {
+      userId = Number.parseInt(location.split('/')[2])
+    }
 
-    socket.on('save_votation', (votationData) => {
-      // вытаскивает временные значения голосов из redis
-      // ...
-      // и сохраняем готовое голосование с результатами в бд, затираем кеш
-      // ...
-      // закрываем комнату
-      socket.broadcast.to(votationId).emit('CLOSE_VOTATION');
-      // чистим кеш
+    this.props.dispatchLastRequest(currentView, {
+      offset: currentPaginationOffset, 
+      limit: DEFAULT_PAGINATION_LIMIT, 
+      userId
     });
-  });
+  }
 }
 
-module.exports = (app) => {
-  let server = Server(app)
-    , io = ws(server);
+// возможно setCurView и setPaginationOffset выставлять внутри соотв. thunk`а?
+// each of 4 types requests should set lastRequest dataList state variable
 
-  io.set('transports', ['websocket']);
-
-  ioEvents(io);
-
-  return server;
-}
-
-// client/app.js
-const createStoreWithMiddleware = applyMiddleware(
-  thunk,
-  socketMiddleware({
-    'votations': votationsSocket, // настраиваются в другом месте
-    'votationRoom': new SocketClient('/votationRoom'),
-    'root': new SocketClient('/')
-  }))
-  (createStore);
-
-// client/actions/votationActions.js
-// вызывается после заполнения всех полей формы
-export function create(votationData) {
-  return { 
-    useSocket: true,
-    nsp: 'votations', 
-    type: CREATE_VOTATION, 
-    promise: (socket) => socket.emit(CREATE_VOTATION, votationData)
+function mapStateToProps({ userReducer, votationsReducer, dataListReducer }) {
+  return {
+    currentView: dataListReducer.currentView,
+    currentPaginationOffset: dataListReducer.currentPaginationOffset
   };
 }
 
-export default function socketMiddleware(sockets) {
-  return ({ dispatch, getState }) => next => action => {
-    if (typeof action === 'function') {
-      return action(dispatch, getState);
+DataList.prototypes = {
+  getVotations: PropTypes.func.isRequired,
+  getUserVotations: PropTypes.func.isRequired,
+  searchVotations: PropTypes.func.isRequired,
+
+  searchUsers: PropTypes.func.isRequired,
+
+  currentlySendingPaginationReq: PropTypes.bool.isRequired,
+  currentView: PropTypes.bool.isRequired,
+  currentViewData: PropTypes.bool.isRequired,
+  currentPaginationOffset: PropTypes.number.isRequired,
+  sendingPaginationRequest: PropTypes.bool.isRequired,  
+}
+
+// ./actions/votationsActions.js
+import { 
+  setCurView, 
+  setCurViewData,
+  setPaginationOffset,
+  sendingPaginationRequest
+} from '../actions/dataListActions.js';
+import {
+  DATA_LIST_VOTATIONS_VIEW,
+  DATA_LIST_USER_VOTATIONS_VIEW,
+  DATA_LIST_VOTATIONS_SEARCH_VIEW,
+  DATA_LIST_USERS_SEARCH_VIEW
+} from '../constants/dataListConstants.js'
+import { API_BASE_PATH } from '../../config.js';
+
+export function getVotations(data) {
+  return (dispatch, getState) {    
+    if (getState().currentView !=== DATA_LIST_VOTATIONS_VIEW) {
+      dispatch(setCurViewData([]));
+      dispatch(setCurView(DATA_LIST_VOTATIONS_VIEW));
     }
 
-    const { useSocket, nsp, type, promise, ...rest } = action;
+    dispatch(sendingPaginationRequest(true));
+    
+    let _status;
 
-    let socket = sockets[nsp];
+    fetch(API_BASE_PATH + '/votations' + constructQuery(data), {
+      headers: {
+        'Accept': 'application/json, text/plain, */*',
+        'Content-Type': 'application/json'
+      },
+      mode: 'cors',
+      method: 'GET',
+      credentials: 'include',
+    })
+    .then(res => {
+      _status = res.status;
+      return res.json();
+    })
+    .then((json) => { 
+      let data = JSON.parse(json);
 
-    if (!useSocket || !promise) {
-      return next();
+      if (_status === 200) {
+        dispatch(setCurViewData(data));
+
+      } else if (_status === 400) {
+        // TODO
+      } else {
+        // TODO
+      }
+      dispatch(sendingPaginationRequest(false));
+    })
+    .catch((err) => {
+        dispatch(setErrorMessage('login', commonErrors.ERROR));
+        dispatch(sendingLoginRequest(false));
+    });
+  };
+}
+
+// ./constants/dataListConstants.js
+'use strict';
+
+module.exports =  {
+  DATA_LIST_VOTATIONS_VIEW: 'DATA_LIST_VOTATIONS_VIEW',
+  DATA_LIST_USER_VOTATIONS_VIEW: 'DATA_LIST_USER_VOTATIONS_VIEW',
+  DATA_LIST_VOTATIONS_SEARCH_VIEW: 'DATA_LIST_VOTATIONS_SEARCH_VIEW',
+  DATA_LIST_USERS_SEARCH_VIEW: 'DATA_LIST_USERS_SEARCH_VIEW',
+
+  SET_CUR_VIEW: 'SET_CUR_VIEW',
+  SET_CUR_VIEW_DATA: 'SET_CUR_VIEW_DATA',
+  SENDING_PAGINATION_REQUEST: 'SENDING_PAGINATION_REQUEST',
+  SET_PAGINATION_OFFSET: 'SET_PAGINATION_OFFSET'
+}
+
+// .actions/dataListActions.js
+import { 
+  getVotations, 
+  getUserVotations, 
+  searchVotations 
+} from '../actions/votationsActions.js';
+import { searchUsers } from '../actions/userActions.js';
+
+export function dispatchLastRequest(view, paginationOffset, limit, data) {
+  return (dispatch, getState) => {
+    let request;
+    switch(view) {
+      case DATA_LIST_VOTATIONS_VIEW:
+        request = getVotations;
+      case DATA_LIST_USER_VOTATIONS_VIEW:
+        request = getUserVotations;
+      case DATA_LIST_VOTATIONS_SEARCH_VIEW:
+        request = searchVotations;
+      case DATA_LIST_USERS_SEARCH_VIEW:
+        request = searchUsers;
+      default:
+        request = getVotations;
     }
 
-    return promise(socket)
-      .then((result) => {
-        return next({ ...rest, result, type })
-      });
+    dispatch(request(paginationOffset, limit, data));
+  };
+}
+
+export function setCurView(view) {
+  return { type: SET_CUR_VIEW, currentView: view }
+}
+
+export function setCurViewData(data) {
+  return { type: SET_CUR_VIEW_DATA, currentViewData: data }
+}
+
+export function setPaginationOffset(offset) {
+  return { type: SET_PAGINATION_OFFSET, currentPaginationOffset: offset }
   }
 }
 
-import io from 'socket.io-client';
-
-export default class SocketClient {
-  constructor(nsp, host = config.host, userId) {
-    this.nsp = nsp;
-    this.host = host;
-    this.userId = userId;
-  }
-
-  connect() {
-    this.socket = io(nsp, host, { transports: ['websocket'] });
-
-    return new Promise((resolve, reject) => {
-      this.socket.on('connect', () => resolve());
-      this.socket.on('connect_error', (error) => reject(error));
-    });
-  }
-
-  disconnect() {
-    return new Promise((resolve) => {
-      this.socket.disconnect(() => { // как передать данные при дисконнекте?
-        this.socket = null;
-        resolve();
-      });
-    });
-  }
-
-  emit(event, data) {
-    return new Promise((resolve, reject) => {
-      if (!this.socket) return reject('No socket connection.');
-
-      return this.socket.emit(event, data, (response) => {
-        if (response.error) {
-          return reject(response.error);
-        }
-
-        return resolve();
-      });
-    });
-  }
-
-  on(event, fun) {
-    return new Promise((resolve, reject) => {
-      if (!this.socket) return reject('No socket connection.');
-
-      this.socket.on(event, fun);
-      resolve();
-    });
-  }
+export function sendingPaginationRequest(sending) {
+  return { type: SENDING_PAGINATION_REQUEST, sendingPaginationRequest: sending };
 }
 
-// votationsSocket.js
-let socket = new SocketClient('/votations');
+// ./reducers/datalistReducer.js
+import {
+  DATA_LIST_VOTATIONS_VIEW,
 
-socket.connect().then(() => {
-  socket.on('VOTATION_CREATED', votationId => {
-    // и перемещаемся по адресу /votations/id
-    // после перехода на страницу с голосованием на клиенте происходит переход
-    dispatch(joinVotation(votationId)); // вызывается экшн из votationRoomSocket.js
-  });
-});
+  SET_CUR_VIEW,
+  SET_CUR_VIEW_DATA,
+  SENDING_PAGINATION_REQUEST,
+  SET_PAGINATION_OFFSET
+} from '../constants/dataListConstants.js'
 
-export default votationSocket;
+import { 
+  DEFAULT_PAGINATION_OFFSET, 
+} from '../constants/commonConstants.js';
+
+const initialState = {
+  currentView: DATA_LIST_VOTATIONS_VIEW,
+  currentViewData: [],
+  currentPaginationOffset: DEFAULT_PAGINATION_OFFSET,
+  sendingPaginationRequest: false
+}
+
+const assign = Object.assign;
+
+export default datalistReducer(state = initialState, action) {
+  switch(action.type) {
+    case SET_CUR_VIEW:
+      return assign({}, state, {
+        currentView: action.currentView
+      });
+    case SET_CUR_VIEW_DATA: {
+      let newData = state.currentViewData;
+      newData.push(action.currentViewData);
+
+      return assign({}, state, {
+        currentViewData: newData
+      });
+    }
+    case SENDING_PAGINATION_REQUEST: 
+      return assign({}, state, {
+        sendingPaginationRequest: action.sendingPaginationRequest
+      });
+    case SET_PAGINATION_OFFSET:
+      return assign({}, state, {
+        currentPaginationOffset: actions.offset
+      });
+    default:
+      return state;
+  }
+}
