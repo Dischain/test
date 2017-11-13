@@ -1,115 +1,103 @@
-// в SocketClient:
-connect(query) {
-  let host = this.host + (query ? query : '');
-  this.socket = io.connect(host, { transports: ['websocket'] });
-  // ...
-}
-
-// ./ws/votationSocket.js
-import SocketClient from './SocketClient.js';
-
-let socket = new SocketClient('/votations', );
-
-socket.on('VOTATION_CREATED', (votationId) => { //dispatch выставляется в middleware
-  socket.dispatch(setNewlyCreatedVotationId(votationId));
-});
-
-// ./actions/socketVotationActions.js
-import { CREATE_VOTATION, SET_NEWLY_CREATED_VOTATION_ID } from '../constants/socketVotationConstants.js';
-
-let useSocket = true, nsp = 'votations';
-
-export function createVotation(votationData) {
-  return {
-    useSocket,
-    nsp, 
-    type: CREATE_VOTATION, 
-    promise: (socket) => socket.emit(CREATE_VOTATION, votationData)   
-  };
-}
-
-export function setNewlyCreatedVotationId(votationId) {
-    return {
-        type: SET_NEWLY_CREATED_VOTATION_ID,
-        votationId
-    };
-}
-
-// ./actions/socketVotationRoomActions.js
-import { JOIN, INVITE, SEND_VOTE, SAVE_VOTATION } from '../constants/socketVotationRoomConstants.js';
-
-let useSocket = true, nsp = 'votationRoom';
-
-// { votationId, userId, cretorId }
-export function joinVotation(votationData) {
-  return {
-    useSocket,
-    nsp, 
-    type: JOIN, 
-    promise: (socket) => socket.emit(JOIN, votationData)   
-  };
-}
-
-export function inviteToVotation(data) {
-  return {
-    useSocket,
-    nsp, 
-    type: INVITE, 
-    promise: (socket) => socket.emit(INVITE, votationData)   
-  };
-}
-
-export function sendVote(data) {
-  return {
-    useSocket,
-    nsp, 
-    type: SEND_VOTE, 
-    promise: (socket) => socket.emit(SEND_VOTE, votationData)   
-  };
-}
-
-export function saveVotation(data) {
-  return {
-    useSocket,
-    nsp, 
-    type: SAVE_VOTATION, 
-    promise: (socket) => socket.emit(SAVE_VOTATION, votationData)   
-  };
-}
-
-// ./middleware/ws.js
-export default function socketMiddleware(sockets) {
-  return ({ dispatch, getState }) => next => action => {
-    if (typeof action === 'function') {
-      return action(dispatch, getState);
+    /*Убрать color: #0366d6; из <a>-тега и переместить в votation-data__name*/
+    /************************************************************************************************/
+    .votations-filter { /*./components/_votations-filter.css*/
+      padding-top: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px #e1e4e8 solid;
+    }
+    
+    .votations-filter__sb-wrapper {
+      padding-right: 24px;
+      width: 99%;
+      display: table-cell;
+      white-space: nowrap;
+    }
+    .votations-filter__controls-wrapper {
+      display: table-cell;
+      width: 1%;
+      position: relative;
+      white-space: nowrap;
+    }
+   
+    .search-box { /*./components/_search-box.css*/
+      width: 100%;
+      min-height: 34px;
+      box-sizing: border-box;
+      border-radius: 2px;
+      font-size: 16px;
+      padding-left: 25px;
+      border: 1px solid #6CC0E5;
+      background-color: #fff;
+      background-image: url('search-icon-sm.png');
+      background-repeat: no-repeat;
+      background-position: 5px 5px;
+    }
+    .select-list { /*./compoenents/_select-list.css*/
+      border: 1px solid #6CC0E5;
+      background: transparent;
+      border-radius: 3px;
+      width: auto;
+      padding: 5px 10px 5px 5px;
+      font-size: 16px;
+      height: 34px;
+    }
+    .votations-btn {
+      padding: 7px;
+      margin-left: 16px;
+      color: #6CC0E5;
+      border: 1px solid #6CC0E5;
+      border-radius: 3px;
+      text-decoration: none;
+      user-select: none;
+      display: inline-block;
+    }
+    .votations-btn:hover {
+      color: white;
+      background-color: #6CC0E5;
+    }
+    .btn {
+      padding: 7px;
+      margin-left: 16px;
+      color: #6CC0E5 !important;
+      border: 1px solid #6CC0E5;
+      border-radius: 3px;
+      text-decoration: none;
+      user-select: none;
+      display: inline-block;
     }
 
-    const { useSocket, nsp, type, promise, ...rest } = action;
-
-    let socket = sockets[nsp];
-
-    if (!useSocket) {
-      return next(action);
+    .btn:hover {
+      color: white;
+      background-color: #6CC0E5;
+      cursor: pointer;
     }
-
-    if (!socket.dispatch) socket.dispatch = dispatch;
-
-    return promise(socket)
-      .then((result) => {
-        return next({ ...rest, result, type }) // тут включается редьюсер и изменяет состояние
-                                               // в соотв. с указанным типом.
-      });
-  }
-}
-
-// in component:
-// import { someAction } from socketActions.js;
-// ...
-// dispatch(someAction(someData));
-// ...
-// function mapDispatchToProps(dispatch) {
-//   return {
-//     dispatch: func => dispatch(func),
-//     someAction: 
-//   };
-// }
+    /************************************************************************************************/
+  </style>
+</head>
+<body>
+  <div class="container clearfix">   
+    <div class="content float-left">
+      <div class="position-relative">
+        <!--Votations Filter Start-->
+        <div class="votations-filter">
+          <form class="display-table">
+            <div class="votations-filter__sb-wrapper">
+              <input class="search-box" type="search" placeholder="Search votations..." autocomplete="off"></input>
+            </div>
+            <div class="votations-filter__controls-wrapper text-right">
+              <select class="select-list">
+                <option value="All">All</option>
+                <option value="Owner">Owner</option>
+                <option value="Participated">Participated</option>
+              </select>
+              <div class="btn">
+                <a >New</a>
+              </div>
+            </div>            
+          </form>
+        </div>
+        <!--Votations Filter End-->        
+      </div>
+    </div>
+  </div>
+</body>
