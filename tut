@@ -1,0 +1,186 @@
+1. Redis Strings
+
+Если создать некоторый список или ключ строки с именем уже существ.
+списка или ключа строки, возвращает ошибку.
+
+Доступ за O(1)
+Реализованы в sds.h (Simple Dynamic Strings)
+struct sdshdr {
+    long len; // длина строки за O(1)
+    long free; // количество дополнительных байт для исп.
+    char buf[]; // собственно строка
+};
+
+1.1 SET, GET:
+
+> set mykey somevalue
+OK
+> get mykey
+"somevalue"
+
+Если ключ уже существ., SET заменит существ. значение
+Значением может быть строка любого типа
+
+1.2 GETSET
+
+> getset mykey somenewvalue
+"somevalue"
+> get mykey
+"somenewvalue"
+
+1.3 MSET, MGET
+
+Множественная ставка и выборка
+
+> mset a 10 b 20 c 30
+OK
+> mget a b c
+1) "10"
+2) "20"
+3) "30"
+
+1.4 EXISTS, DEL
+
+> set mykey hello
+OK
+> exists mykey
+(integer) 1
+> del mykey
+(integer) 1
+> exists mykey
+(integer) 0
+
+
+EXISTS вернет 1 если 0 данный ключ существует или нет.
+То же касается DEL
+
+1.5 TYPE
+
+Возвращает тип значения по данному ключу
+
+> set mykey x
+OK
+> type mykey
+string
+> del mykey
+(integer) 1
+> type mykey
+none
+
+2. Redis Lists
+
+Реализован как Linked List. Доступ к эл-там линейный, вставка
+в начало или в конец константная. 
+Реализация через связный список выбрана в связи с тем, что для
+системы баз данных важно быть сбосоной добавлять элементы в очень
+длинный список за короткое время.
+
+Если все элементы списка удалены, список перестает существовать
+
+Если нужен быстрый доступ к случайному элементу, след. выбрать
+Redis Sorted Set
+
+2.1 LPUSH, RPUSH, LRANGE, RPOP, LPOP
+
+> rpush mylist A
+(integer) 1
+> rpush mylist B
+(integer) 2
+> lpush mylist first
+(integer) 3
+> lrange mylist 0 -1
+1) "first"
+2) "A"
+3) "B"
+
+LPUSH добавляет эл-т в лево (в голову), RPUSH добавляет элемент в 
+право (в хвост). Обе команды принимают множество аргументов.
+
+2.1 LTRIM, LLEN
+
+Вырезает эл-ты списка в указанном диппазоне.
+
+> rpush mylist 1 2 3 4 5
+(integer) 5
+> ltrim mylist 0 2
+OK
+> lrange mylist 0 -1
+1) "1"
+2) "2"
+3) "3"
+> llen mylist
+3
+
+3. Redis Hashes
+
+Redis Hash идеально подходит для хранения объектов
+
+Доступ за O(1)
+
+// зададим объекту user:1000 поле username, birthyear и verified
+> hmset user:1000 username antirez birthyear 1977 verified 1
+OK
+
+// получаем только его имя
+> hget user:1000 username
+"antirez"
+> hget user:1000 birthyear
+"1977"
+
+// получаем все его поля
+> hgetall user:1000
+1) "username"
+2) "antirez"
+3) "birthyear"
+4) "1977"
+5) "verified"
+6) "1"
+
+HMSET помещает множество полей в хеш
+
+4. Redis Sets
+
+Redis Sets - неупорядочная коллекция строк. Не сортирут и не сохраняет послед. вставки.
+
+Доступ за O(N)
+
+> sadd myset 1 2 3
+(integer) 3
+> smembers myset
+1. 3
+2. 1
+3. 2
+
+// проверка на членство
+> sismember myset 3
+(integer) 1
+
+Отлично подходит для хранения реляционных данных
+
+> sinter set1 set2
+// выведет пересечение множеств
+
+> sunionstore newset set1 set2
+// объединит set1 и set2 и поместит в newset
+
+> scard myset 
+// вернет мощность множества (cardinality)
+
+5. Redis Sorted Sets
+
+Представляют собой среднее между Set и Hash. Как и множества, содержат
+уникальные элементы. Однако, т.к. элементы в множестве неупорядочены,
+каждый элемент в Sorted Set ассоциирован со значением (поэтому сортированное множество так же похоже на Hash, т.к. каждый элемент
+отображен на значение).
+
+Реализованы как Skip List и предоставляют O(log(N)) дотуп.
+
+> zadd hackers 1940 "Alan Kay"
+(integer) 1
+> zadd hackers 1957 "Sophie Wilson"
+(integer) 1
+> zadd hackers 1912 "Alan Turing"
+(integer) 1
+
+Так как множество отсортировано, ZRANGE hackers 0 -1 (как LRANGE) вернет список результатов
+в заданном диапазоне, но так же и отсортирует его
