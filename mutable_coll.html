@@ -1,0 +1,82 @@
+<style>
+
+.main {
+  color: blue;
+}
+.sub {
+  padding-left: 15px; 
+  color: blue; 
+  border-left: 2px solid gray;
+}
+</style>
+<h3>HashTable.scala</h3>
+<span class="main">
+  <code>
+    trait HashTable[A, Entry >: Null <: HashEntry[A, Entry]] extends HashTable.HashUtils[A]
+  </code>
+</span> - trait, реализующий хеш таблицу на методе цепочек. Может быть исполльзован 
+для создания структур данных, основаных на хеш-таблицах.
+<p></p>
+<span class="sub">
+  <code>
+   trait HashEntry [A, E <: HashEntry[A, E]]
+  </code>
+</span>
+<p></p>
+
+<h3>HashSet.scala</h3>
+<span class="main">
+  <code>
+    class HashSet[A] private[collection] (contents: FlatHashTable.Contents[A]) extends AbstractSet[A] with FlatHashTable[A]    
+  </code>
+</span> - реализует mutable множество на хеш-таблицах <code>FlatHashTable</code> - внутренняя реализация, примиксовываемая
+к разным коллекциям, основаным на хеш-таблицах
+<p></p>
+
+<h3>LinkedHashMap.scala</h3>
+<span class="main">
+  <code>
+    class LinkedHashMap[A, B] extends AbstractMap[A, B] with Map[A, B] with MapLike[A, B, LinkedHashMap[A, B]] with HashTable[A, LinkedEntry[A, B]]
+  </code>
+</span> - реализует mutable maps на хеш-таблицах <code>HashTable</code>, сохраняя последовательность вставки
+<p></p>
+
+<h3>LinkedHashSet.scala</h3>
+<span class="main">
+  <code>
+    class LinkedHashSet[A] extends AbstractSet[A] with Set[A] with GenericSetTemplate[A, LinkedHashSet] with SetLike[A, LinkedHashSet[A]] with HashTable[A, LinkedHashSet.Entry[A]]
+  </code>
+</span> - реализует mutable set на хеш-таблицах <code>HashTable</code>, сохраняя последовательность вставки
+<p></p>
+
+<h3>SortedMap.scala</h3>
+<span class="main">
+  <code>
+    trait SortedMap[A, B] extends Map[A, B] with collection.SortedMap[A, B] with MapLike[A, B, SortedMap[A, B]] with SortedMapLike[A, B, SortedMap[A, B]]
+  </code>
+</span> - реализует mutable sorted map с отсортированными ключами. Основан на <code>TreeMap</code>, который основан на RBTree.
+<p></p>
+
+<h3>SortedSet.scala</h3>
+<span class="main">
+  <code>
+    trait SortedSet[A] extends scala.collection.SortedSet[A] with scala.collection.SortedSetLike[A,SortedSet[A]] with mutable.Set[A] with mutable.SetLike[A, SortedSet[A]]
+  </code>
+</span> - реализует mutable sorted set с отсортированными элементами. Основан на <code>TreeSet</code>, который основан на RBTree.
+<p></p>
+
+<h3>TreeMap.scala</h3>
+<span class="main">
+  <code>
+    sealed class TreeMap[A, B] private (tree: RB.Tree[A, B])(implicit val ordering: Ordering[A]) extends AbstractSortedMap[A, B] with SortedMap[A, B] with MapLike[A, B, TreeMap[A, B]] with SortedMapLike[A, B, TreeMap[A, B]]  
+  </code>
+</span> - mutable sorted map реализованный на RBTree
+<p></p>
+
+<h3>TreeSet.scala</h3>
+<span class="main">
+  <code>
+    sealed class TreeSet[A] private (tree: RB.Tree[A, Null])(implicit val ordering: Ordering[A]) extends AbstractSortedSet[A] with SortedSet[A] with SetLike[A, TreeSet[A]] with SortedSetLike[A, TreeSet[A]]
+  </code>
+</span> - mutable sorted set реализованный на RBTree
+<p></p>
