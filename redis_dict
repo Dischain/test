@@ -1,0 +1,166 @@
+// DICT_HT_INITIAL_SIZE (4)
+
+static void _dictRehashStep(dict *d) {
+    if (d->iterators == 0) __dictRehash__(d,1);
+}
+
+/* With _dictRehashStep  */
+
+/* This function performs just a step of rehashing, and only if there are
+ * no safe iterators bound to our hash table. When we have iterators in the
+ * middle of a rehashing we can't mess with the two hash tables otherwise
+ * some element can be missed or duplicated.
+ *
+ * This function is called by common lookup or update operations in the
+ * dictionary so that the hash table automatically migrates from H1 to H2
+ * while it is actively used. */
+dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing) {
+    long index;
+    dictEntry *entry;
+    dictht *ht;
+
+    if (dictIsRehashing(d)) _dictRehashStep(d); // <------
+
+    /* Get the index of the new element, or -1 if
+     * the element already exists. */
+    if ((index = _dictKeyIndex(d, key, dictHashKey(d,key), existing)) == -1)
+        return NULL;
+
+    /* Allocate the memory and store the new entry.
+     * Insert the element in top, with the assumption that in a database
+     * system it is more likely that recently added entries are accessed
+     * more frequently. */
+    ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];
+    entry = zmalloc(sizeof(*entry));
+    entry->next = ht->table[index];
+    ht->table[index] = entry;
+    ht->used++;
+
+    /* Set the hash entry fields. */
+    dictSetKey(d, entry, key);
+    return entry;
+}
+
+/* Search and remove an element. This is an helper function for
+ * dictDelete() and dictUnlink(), please check the top comment
+ * of those functions. */
+static dictEntry *dictGenericDelete(dict *d, const void *key, int nofree) {
+    uint64_t h, idx;
+    dictEntry *he, *prevHe;
+    int table;
+
+    if (d->ht[0].used == 0 && d->ht[1].used == 0) return NULL;
+
+    if (dictIsRehashing(d)) _dictRehashStep(d); // <-----
+    h = dictHashKey(d, key);
+
+    for (table = 0; table <= 1; table++) {
+        idx = h & d->ht[table].sizemask;
+        he = d->ht[table].table[idx];
+        prevHe = NULL;
+        while(he) {
+            if (key==he->key || dictCompareKeys(d, key, he->key)) {
+                /* Unlink the element from the list */
+                if (prevHe)
+                    prevHe->next = he->next;
+                else
+                    d->ht[table].table[idx] = he->next;
+                if (!nofree) {
+                    dictFreeKey(d, he);
+                    dictFreeVal(d, he);
+                    zfree(he);
+                }
+                d->ht[table].used--;
+                return he;
+            }
+            prevHe = he;
+            he = he->next;
+        }
+        if (!dictIsRehashing(d)) break;
+    }
+    return NULL; /* not found */
+}
+
+dictEntry *dictFind(dict *d, const void *key) {
+    dictEntry *he;
+    uint64_t h, idx, table;
+
+    if (d->ht[0].used + d->ht[1].used == 0) return NULL; /* dict is empty */
+    if (dictIsRehashing(d)) _dictRehashStep(d); // <---------
+    h = dictHashKey(d, key);
+    for (table = 0; table <= 1; table++) {
+        idx = h & d->ht[table].sizemask;
+        he = d->ht[table].table[idx];
+        while(he) {
+            if (key==he->key || dictCompareKeys(d, key, he->key))
+                return he;
+            he = he->next;
+        }
+        if (!dictIsRehashing(d)) return NULL;
+    }
+    return NULL;
+}
+
+/* with dictRehashMilliseconds */
+
+/* Rehash for an amount of time between ms milliseconds and ms+1 milliseconds */
+int dictRehashMilliseconds(dict *d, int ms) {
+    long long start = timeInMilliseconds();
+    int rehashes = 0;
+
+    while(dictRehash(d,100)) {
+        rehashes += 100;
+        if (timeInMilliseconds()-start > ms) break;
+    }
+    return rehashes;
+}
+
+trait HashTable[A, Entry >: Null <: HashEntry[A, Entry]] extends HashTable.HashUtils[A] {
+  // создается таблица с некоторым capacity, который зависит от initialSize
+  protected var table: Array[HashEntry[A, Entry]] = new Array(initialCapacity)
+  
+  protected var _loadFactor = defaultLoadFactor // 75%
+  // след. два значения нужны для resize: if (tableSize > threshold) -> resize(2 * table.length)
+  protected var tableSize: Int = 0 // кол. элементов в таблице
+  protected var threshold: Int = initialThreshold(_loadFactor) // след. значение, после кот. вып. resize
+  
+  // нужен только для вычисления первичного размера табл., больше не используется.
+  protected def initialSize: Int = 16  
+  private def initialThreshold(_loadFactor: Int): Int = newThreshold(_loadFactor, initialCapacity)
+  private def initialCapacity = capacity(initialSize)
+ 
+  private def lastPopulatedIndex
+
+  private[collection] def init(in: java.io.ObjectInputStream, readEntry: => Entry)
+
+  @deprecatedOverriding protected def findEntry(key: A): Entry
+  protected[this] final def findEntry0
+  @deprecatedOverriding protected def addEntry(e: Entry)
+  protected[this] final def addEntry0
+
+  protected def findOrAddEntry[B](key: A, value: B): Entry
+  protected def createNewEntry[B](key: A, value: B): Entry
+  @deprecatedOverriding protected def removeEntry(key: A) : Entry
+  
+  protected def entriesIterator: Iterator[Entry] = new AbstractIterator[Entry] 
+  protected def foreachEntry[U](f: Entry => U)
+  protected def clearTable()
+  private def resize(newSize: Int)
+
+  protected def elemEquals(key1: A, key2: A): Boolean = (key1 == key2)
+  protected final def index(hcode: Int): Int
+  protected def initWithContents(c: HashTable.Contents[A, Entry])  
+}
+
+private[collection] object HashTable {
+  private[collection] final def defaultLoadFactor: Int = 750 // corresponds to 75%
+  private[collection] final def loadFactorDenum = 1000 // should be loadFactorDenom, but changing that isn't binary compatible
+
+  private[collection] final def newThreshold(_loadFactor: Int, size: Int) = 
+    ((size.toLong * _loadFactor) / loadFactorDenum).toInt
+
+  private[collection] final def sizeForThreshold(_loadFactor: Int, thr: Int) = 
+    ((thr.toLong * loadFactorDenum) / _loadFactor).toInt
+
+  private[collection] final def capacity(expectedSize: Int) = nextPositivePowerOfTwo(expectedSize)
+}
