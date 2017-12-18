@@ -1,4 +1,42 @@
 // DICT_HT_INITIAL_SIZE (4)
+Incremental resizing[edit]
+One alternative to enlarging the table all at once is to perform the rehashing gradually:
+
+During the resize, allocate the new hash table, but keep the old table unchanged.
+In each lookup or delete operation, check both tables.
+Perform insertion operations only in the new table.
+At each insertion also move r elements from the old table to the new table.
+When all elements are removed from the old table, deallocate it.
+To ensure that the old table is completely copied over before the new table itself needs to be enlarged, 
+it is necessary to increase the size of the table by a factor of at least (r + 1)/r during resizing.
+
+Inside the Redis distribution you can find "dict.c" that is a very easy to understand hash table 
+implementation that uses incremental rehashing, that is, when it needs to switch to a bigger or smaller 
+table this happens incrementally in three ways:
+1) At every operation you perform there is a rehashing step.
+2) You have a function that you can call to perform a rehashing step.
+3) There is an higher level function where you can say "rehash for N milliseconds" in case you have some 
+idle time to spend for a good cause inside your program.
+
+Another uncommon thing of dict.c is that it supports the "pick a random element" operation with guaranteed O(1) behaviour.
+
+EDIT: Now that I look at the source, clearly while the code is easy to follow a design section 
+should be present in the dict.c top-comment. I'll make sure to add this, but long story short:
+
+* We use both chaining and incremental rehashing. This means that there is no need to rehash ASAP when 
+the hash table reached the max % of elements allowed. At the same time using the incremental rehashing 
+there is no need to block.
+* We support safe and unsafe iterators: safe iterators block the rehashing when they are active, so you 
+have the feeling you are accessing the hash table in a read-only way. Unsafe iterators are ok for 
+looping even while an incremental rehashing is in progress, but is not ok to touch the hash table 
+while iterating with an unsafe iterator (otherwise the iterator no longer guarantees to return all the 
+elements, or to avoid duplicated elements).
+* The hash table is rehashed both ways: if it's too full, or if it's too empty. This way there is the 
+guarantee that a table has always a percentage between a min and max. This guarantees that our random 
+element function is in the average case O(1).
+* When we rehash, a second table is created, and stuff are moved incrementally from one to the other. 
+When we have two tables, all the lookup / delete operations are run against both the table as the element 
+can be in the old or in the new table. Instead insertions only happen in the new table.
 
 static void _dictRehashStep(dict *d) {
     if (d->iterators == 0) __dictRehash__(d,1);
