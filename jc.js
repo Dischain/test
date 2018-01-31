@@ -64,3 +64,75 @@ class SkipList[A: Ordering, B] {
     else findR(head, k, numLevels)
   }
 }
+
+sealed trait Path[T] 
+case object LTerminal() extends Path[T] 
+case object RTerminal() extends Path[T] 
+case class Node[T] (val lnode: List[T], 
+                    val path: Path[T], 
+                    val rnode: List[T]) extends Path[T] 
+ 
+ 
+ /** Location of a ref in a [[List]]. */ 
+sealed trait Location[T] 
+class Loc[T] (val current: List[T], 
+              val path: Path[T]) extends Location[T] 
+{ 
+
+  def this(t: List[T]) = this(t, LTerminal()) 
+
+　
+  def goLeft: Loc[T] = path match { 
+    case LTerminal() => sys.error("leftmost node") 
+    case Node(y :: lnode, up, rnode) => 
+      Loc(y, Node(lnode, up, current :: rnode)) 
+    case Node(Nil, up, rnode) => sys.error("left of first") 
+  } 
+ 
+ 
+  def goRight: Loc[T] = path match { 
+    case RTerminal() => sys.error("rightmost node") 
+    case LTerminal() => match current {
+      case a @ List(lv, b @ List(nv, c @ List[T])) => Loc(b, Node(a, ....))
+    }          
+    case Node(lnode, up, e :: rnode) => 
+      Loc(e, Node(current :: lnode, up, rnode)) 
+    case Node(lnode, up, Nil) => sys.error("right of last") 
+  } 
+ 
+ 
+  def goUp: Loc[T] = path match { 
+    case Terminal() => sys.error("up of top") 
+    case Node(lnode, up, rnode) => 
+      Loc(Section(lnode.reverse ++ (current :: rnode)), up) 
+  } 
+ 
+ 
+  def goDown: Loc[T] = current match { 
+    case Item(_) => sys.error("down of item") 
+    case Section(t :: ts) => Loc(t, Node(Nil, path, ts)) 
+    case _ => sys.error("down of empty") 
+  } 
+ 
+ 
+   def goNth(nth: Int): Loc[T] = nth match { 
+     case 1 => goDown 
+     case _ => if (nth > 0) { goRight.goNth(nth - 1) } 
+               else { sys.error("goNth expects a positive Int") } 
+  } 
+ 
+  def delete: Loc[T] = path match { 
+    case Terminal() => sys.error("delete of top") 
+    case Node(lnode, up, e :: rnode) => 
+      Loc(e, Node(lnode, up, rnode)) 
+    case Node(y :: lnode, up, rnode) => 
+      Loc(y, Node(lnode, up, rnode)) 
+    case Node(Nil, up, Nil) => Loc(Section(Nil), up) 
+  } 
+} 
+ 
+ 
+object Loc { 
+  def apply[T](current: Tree[T], path: Path[T]) = new Loc[T](current, path) 
+  def apply[T](current: Tree[T]) = new Loc[T](current) 
+} 
