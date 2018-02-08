@@ -1,43 +1,39 @@
-// rename genericDelete to getNodeParent:
-Tree: 
-protected[ds] def getNodeParent[C >: A](k: C, initial: RBTree[C, B]): RBTree[C, B] = { 
-  if (implicitly[Ordering[C]].lt(k, key)) 
-    Tree(color, left.getNodeParent(k, this), key, value, right) 
-  else if (implicitly[Ordering[C]].gt(k, key)) 
-    Tree(color, left, key, value, right.getNodeParent(k, this)) 
-  else 
-    initial
-} 
-Leaf:
-protected[ds] def getNodeParent[C >: A](k: C, initial: RBTree[C, B]): RBTree[C, B] = initial
+def insert(k: A, v: B): Option[B] = {
+  def insertR(node: SLNode[A, B], newNode: SLNode[A, B], level: Int): Option[B] = {
+    val key = newNode.key
+    val next = node.forward(level)
 
-private[this] def bstDeletion[C >: A](k: C): RBTree[C, B] = this match {
-  case Tree(c, l: Tree, key, value, r: Tree) => {
-    if (k < key) Tree(c, l.bstDeletion(k), key, value, r)
-    if (k > key) Tree(c, l, key, value, r.bstDeletion(k))
-    else {
-      val (minK, minV) = getMinChildOf(l)
-      Tree(c, l, minK, minV, r.bstDeletion(minK))
+    if (next.isEmpty || implicitly[Ordering[A]].lt(key, next.key)) {
+      if (level < newNode.level) { 
+        newNode.forward (level) = next 
+        node.forward (level) = newNode 
+      } 
+      if (level != 0) insertR(node, newNode, level - 1) 
+      else Some(v) 
     }
+    else insertR(next, newNode, level)
   }
+  
+  find(k) match {
+    case Some(item) => None
+    case _ => insertR(head, SLNode[A, B](k, v, randomLevel()), numLevels)
+  }  
 }
 
-protected[this] def getMinChildOf[C >: A](node: RBTree[C, B]): (C, B) = node match {
-  case Tree(_, Leaf(), k, v, Leaf()) => (k, v)
-  case Tree(_, l, _, _, _) => getMinChildOf(l)
-}
+private var head: SLNode[A, B] = new SLNode[A, B](maxLevel)
 
-private[this] getNode[C >: A](k: C): Option[B] = { 
-  if (implicitly[Ordering[C]].lt(k, key)) left.get(k) 
-  else if (implicitly[Ordering[C]].gt(k, key)) right.get(k) 
-  else this
+class SLNode[A: Ordering, B] (val key: A, val value: B, val level: Int, val isEmpty: Boolean = false) { 
+  def this(level: Int) { 
+    this(null.asInstanceOf[A], null.asInstanceOf[B], level, true) 
+  } 
+  
+  def this() { 
+    this(null.asInstanceOf[A], null.asInstanceOf[B], -1, true) 
+  } 
+ 
+  val forward: Array[SLNode[A, B]] = 
+    Array.fill[SLNode[A, B]](level)(new SLNode[A, B]()) 
+ 
+  def apply(key: A, value: B, level: Int): SLNode[A, B] = 
+    new SLNode[A, B](key, value, level) 
 } 
-
-　
-def delete[C >: A](k: C): RBTree[C, A] = {
-  getNode(k, initial = this) match {
-    case Tree(_, l: Tree, key, value, r: Tree) => bstDeletion(k)
-    case Leaf() => this
-    case _ => rbDeletion(k)
-  }
-}
