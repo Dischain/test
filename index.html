@@ -1,303 +1,172 @@
-<head>
-  <style>
-    body, form, ul {
-      margin: 0px;
+/** 
+ * case class Person(name: String, address: Address)
+ * case class Address(street: String, city: String)
+ * 
+ * implicit val addressRead = new Readable[Address] {
+ *   def read(addr: JsonVal): Option[Address] = {
+ *     for {
+ *       street <- (addr </> "street") as[String]
+ *       city <- (addr </> "city") as[String]
+ *     } Option(Address(street, city))
+ *   }
+ * }
+ *
+ * implicit val personRead = new Readable[Person] {
+ *   def read(person: JsonVal): Option[Person] = {
+ *     for {  
+ *       name <- (person </> "name") as[String]
+ *       address <- (person </> "address") as[Address]
+ *     }
+ *   }
+ * }
+ */
+trait Readable[A] {
+  def read(jsonVal: JsonVal): Option[A]
+}
+
+object ImplicitConversions {
+  implicit val intReadeable = new Readable[Int] { 
+    def read(jn: JsonNumber): Option[Int] = jn match { // либо все таки Some(jn.value)
+      case JsonNumber(number: Int) => Some(number)
+      case _ => None
     }
-    ul { padding: 0px; }
-    a {
-      color: #0366d6;
-      text-decoration: none;
-      background-color: transparent;
+  }
+
+  implicit val floatReadeable = new Readable[Float] {
+    def read(jn: JsonNumber): Option[Float] = jn match {
+      case JsonNumber(number: Float) => Some(number)
+      case _ => None
     }
-    .fixed-left {
-      position: fixed;
-      top: 24px;      
-    }
-    .clearfix:after {
-      display: block;
-      clear: both;
-      content: "";
-    }
-    .float-left {
-      float: left !important;
-    }
-    .float-right {
-      float: right !important;
-    }
-    .position-relative {
-      position: relative !important;
-    }
-    .text-right {
-      text-align: right !important;
-    }
-    .display-table {
-      display: table !important;
-    }
-    .display-inline {
-      display: inline !important;
-    }
-    .display-block {
-      display: block !important;
-    }
-    .text-gray {
-      color: #586069 !important;
-    }
-    .container {
-      max-width: 1012px;
-      margin-top: 24px;
-      margin-left: auto;
-      margin-right: auto;
-      box-sizing: border-box;
+  }
+
+  // ...
+}
+
+/** 
+ * case class Person(name: String, address: Address)
+ * case class Address(street: String, city: String)
+ * 
+ * implicit val addressWriteable = new Writable[Address] {
+ *   def write(addr: Address): JsonVal = {
+ *     Json.obj(
+ *       street -> addr.street,
+ *       city -> addr.city
+ *     )
+ *   }
+ * }
+ *
+ * implicit val personWriteable = new Writable[Person] {
+ *   def write(person: Person): JsonVal = {
+ *     Json.obj(
+ *       name -> person.name,
+ *       address -> Json.toJson(person.address)
+ *     )   
+ *   }
+ * }
+ */
+trait Writable[A] {
+  def write(object: A): JsonVal
+}
+
+final class Parser extends JavaTokenParsers {
+  def object: Parser[JsonObject] = 
+    "{"~> repsep(member, ",") <~"}" ^^ 
+      (JsonObject(Map[String, JsonVal]()) + _)
+
+  def arr: Parser[JsonArray] = 
+    "["~> repsep(value, ",") <~"]" 
+
+  def member: Parser[(Sting, JsonVal)] = 
+    stringLiteral~":"~value ^^ { 
+      case name~":"~value => (name, value) 
     }
 
-    .side-bar {
-      width: 230px;
-      padding-right: 16px;
-      box-sizing: border-box;
-    }
-    .u-avatar {
-      display: inline-block;
-      overflow: hidden;
-      vertical-align: middle;
-      background-size: 214px 214px;      
-    }
-    .u-name {
-      font-size: 26px;
-      line-height: 30px;
-      padding-top: 16px;
-      padding-bottom: 16px;      
-    }
-    .u-details {
-      width: 100%;
-      border-top: 1px #e1e4e8 solid;
-    }
-    .u-details__email {
-      width: 100%;
-      padding-left: 20px;
-      padding-top: 4px;
-      font-size: 14px;
-      color: #24292e;
-      line-height: 1.5;
-    }
+  def value: Parser[JsonVal] = ( 
+    obj 
+      | arr
+      | stringLiteral ^^ (JsonString(_))
+      | longNumber ^^ (JsonNumber(_.toLong))
+      | "null"  ^^ (JsonNull) 
+      | "true"  ^^ (JsonTrue) 
+      | "false" ^^ (JsonFalse) 
+    )
+}
 
-    .content {
-      padding-left: 8px;
-      width: 75%;
-      box-sizing: border-box;
-    }
+object Parser extends Parser {
+  def parse(string: String): JsonVal = parseAll(string) match // ...
+}
 
-    .votations-filter {
-      padding-top: 16px;
-      padding-bottom: 16px;
-      border-bottom: 1px #e1e4e8 solid;
-    }
-    .votations-input {
-      color: #6a737d;
-      width: 100%;
-      min-height: 34px;
-      padding: 6px 8px;
-      font-size: 14px;
-      line-height: 20px;
-      background-color: #fff;
-      background-repeat: no-repeat;
-      background-position: right 8px center;
-      border: 1px solid #6CC0E5;
-      background: transparent;
-      border-radius: 3px;
-    }
-    .votations-select {
-      border: 1px solid #6CC0E5;
-      background: transparent;
-      border-radius: 3px;
-      width: auto;
-      padding: 5px 35px 5px 5px;
-      font-size: 16px;
-      height: 34px;
-    }
-    .votations-btn {
-      padding: 7px;
-      margin-left: 16px;
-      color: #6CC0E5;
-      border: 1px solid #6CC0E5;
-      border-radius: 3px;
-      text-decoration: none;
-      user-select: none;
-      display: inline-block;
-    }
-    .votations-btn:hover {
-      color: white;
-      background-color: #6CC0E5;
-    }
+implicit class Path(jo: JsonObject) {
+  def </> [T](field: String): Option[JsonVal] = jo match {
+    case JsonObject(fields) => fields(field)
+    case _ => None
+  }
+}
 
-    .search-box {
-      padding-right: 24px;
-      width: 99%;
-      display: table-cell;
-      white-space: nowrap;
-    }
-    .filter {
-      display: table-cell;
-      width: 1%;
-      position: relative;
-      white-space: nowrap;
-    }
+object Json {
+  def stringify(value: JsonVal): String = value.toString()
 
-    .votations-list {
+  def parse(string: String): JsonVal = Parser.parse(string)
 
-    }
-    .votations-list__item {
-      padding-top: 20px;
-      padding-bottom: 20px;
-      width: 100%;
-      border-bottom: 1px #e1e4e8 solid;
-    }
-    .votation-data__name {
-      margin-bottom: 4px;
-    }
-    .votation-data__desc {
-      margin-bottom: 8px;
-    }
-    .votation-data__votes {
-      display: inline-block;
-      margin-top: 8px;
-      max-width: 240px;
-    }
-    .vote-sm {
-      display: inline-block;
-      padding: 5px;
-      margin-right: 5px;
-      margin-bottom: 10px;
-      border-radius: 2px;
-      border: 1px solid #e1e4e8;
-      background-color: transparent;
-    }
+  def toJson[T](obj: T)(implicit jw: Writable[T]): JsonVal = 
+    jw.write(obj)
 
-    .user-card {
-      padding-top: 15px;
-      padding-bottom: 15px;
-      width: 100%;
-      border-bottom: 1px #e1e4e8 solid;        
-    }
-    .user-card__avatar {
-      background-size: 75px 75px;
-    }
-    .user-card__name {
-      margin-left: 15px;      
-      word-wrap: break-word;
-    }
+  def fromJson[T](value: JsonVal)(implicit jr: Readable[T]): Option[T] = 
+    jr.read(value)
 
-    .user-info {
-      padding: 5px;
-      color: #6a737c;
-      width: 200px;
-      box-sizing: border-box;
-      background-color: #E0EAF1;
-    }
-    .user-info__date {
-      margin-top: 1px;
-      margin-bottom: 4px;
-      font-size: 12px;
-      text-decoration: none;
-    }
-    .user-info__avatar {
-      background-size: 50px 50px;
-    }
-    .user-info__name {
-      margin-left: 8px;
-      line-height: 17px;
-      word-wrap: breal-word;
-    }
-    .inputfile {
-      width: 0.1px;
-      height: 0.1px;
-      opacity: 0;
-      overflow: hidden;
-      position: absolute;
-      z-index: -1;      
-    }
-    .inputfile + label {
-      padding: 7px;
-      margin-left: 16px;
-      color: #6CC0E5;
-      border: 1px solid #6CC0E5;
-      border-radius: 3px;
-      text-decoration: none;
-      user-select: none;
-      display: inline-block;
-    }
-    .inputfile:focus + label,
-    .inputfile + label:hover {
-      color: white;
-      background-color: #6CC0E5;
-    }
-    .inputfile + label {
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body>
-  <div class="container clearfix">
-    <div class="side-bar float-left">
-      <img class="u-avatar" src="./ava.png" width="214" height="214"></img>
-      <div class="u-name"><span>Username</span></div>
-      <div class="u-details">
-        <span class="u-details__email"><a href="mailto:sano@i.ua">sano@i.ua</a></span>
-      </div>
-    </div>
-    <div class="content float-left">
-      <div class="position-relative">
-        <div class="votations-filter">
-          <form class="display-table">
-            <div class="search-box">
-              <input class="votations-input" type="search" placeholder="Search votations..." autocomplete="off"></input>
-            </div>
-            <div class="filter text-right">
-              <select class="votations-select">
-                <option value="volvo">Volvo</option>
-                <option value="Skoda">Skoda</option>
-              </select>              
-              <a class="votations-btn">New</a>
-            </div>            
-          </form>
-        </div>
-        <div class="votations-list">
-          <ul>
-            <li class="votations-list__item display-block">
-              <div class="votation-data__name">
-                <h3><a>some-votaion-name</a></h3>
-              </div>
-              <div class="votation-data__desc text-gray"
-                <p>Some looong votations description...</p>
-              </div>
-              <div class="clearfix">
-                <div class="votation-data__votes float-left">
-                  <div class="vote-sm">5</div>
-                  <div class="vote-sm">5</div>
-                  <div class="vote-sm">5</div>
-                </div>
-                <div  class="user-info float-right clearfix">
-                  <div class="user-info__date">created
-                    <span>Nov 22 at 15:00</span>
-                  </div>
-                  <img class="user-info__avatar float-left" src="./ava.png" width="50" height="50"></img>                  
-                  <div class="user-info__name float-left">
-                    <a href="#">Dischain</a>
-                  </div>
-                </div>
-              </div>
-            </li>
-            <li class="user-card clearfix display-block">
-              <img class="user-card__avatar float-left" src="./ava.png" width="75" height="75"></img>                  
-              <div class="user-card__name float-left">
-                <a href="#">Dischain</a>
-              </div>
-            <li class="user-card clearfix display-block">
-              <input type="file" name="file" id="file" class="inputfile" />
-              <label for="file">Choose a file</label>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-</body>
+  def obj(members: (String, JsonVal)*): JsonObject = JsonObject(members)    
+}
+
+trait JsonTransformable {
+  def as[T](implicit readable: Readable[T]): T = readable.read(this) match {
+    case Some(result) => result
+    case None => throw new Exception ...
+  }
+}
+
+sealed trait JsonVal extends JsonTransformable
+
+case object JsonNull extends JsonVal {
+  override def toString: String = "\"null\""
+}
+
+sealed trait JsonBoolean extends JsonVal
+
+case object JsonTrue extends JsonBoolean {
+  override def toString: String = "true"
+}
+case object JsonFalse extends JsonBoolean {
+  override def toString: String = "false"
+}
+
+case class JsonNumber(private[json] value: Long) extends JsonVal {
+  override def toString: String = value.toString
+}
+
+case class JsonString(private[json] value: String) extends JsonVal {
+  override def toString: String = "\"" + value + "\""
+}
+
+case class JsonArray(private[json] value: IndexedSeq[JsonVal] = Array[JsonVal]()) 
+extends JsonVal 
+{
+  // ...
+
+  override def toString: String = value.mkString(",")
+}
+
+case class JsonObject(private[json] val fields: Map[String, JsonVal]) extends JsonVal {
+  // ...  
+  override def toString: String = fields.toSeq.mkString(", ")  
+}
+
+object JsonObject {
+  def apply(members: (String, JsonVal)*): JsonObject = 
+    member foldLeft
+      (JsonObject(Map[JsonString, JsonObject]()))
+      ((init: JsonObject, current: [JsonString -> JsonObject]) =>
+        {
+          init + current
+        }
+      )
+}
