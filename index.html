@@ -1,172 +1,31 @@
-/** 
- * case class Person(name: String, address: Address)
- * case class Address(street: String, city: String)
- * 
- * implicit val addressRead = new Readable[Address] {
- *   def read(addr: JsonVal): Option[Address] = {
- *     for {
- *       street <- (addr </> "street") as[String]
- *       city <- (addr </> "city") as[String]
- *     } Option(Address(street, city))
- *   }
- * }
- *
- * implicit val personRead = new Readable[Person] {
- *   def read(person: JsonVal): Option[Person] = {
- *     for {  
- *       name <- (person </> "name") as[String]
- *       address <- (person </> "address") as[Address]
- *     }
- *   }
- * }
- */
-trait Readable[A] {
-  def read(jsonVal: JsonVal): Option[A]
+Handling exceptions for multiple async requests with scalaz disjunction.
+
+So here the sequence of operations I want to perform:
+
+0. I need a several synchronouse functions which potentially may cause an exceptions (for example, perform IO).
+1. And I need them to perform async so I wrap this functions in Future.
+2. After all call them in parallel or synchronously (it's actually doesn't matter) with for-comprehension.
+3. And construct some complex result from results of given functions.
+4. But also I want to catch all erroneuse situations which might to occure.
+5. Finally, return something like scala Either or scalaz disjunction \/ (which is more preferable for me)
+in order the client code may to pattern match on it.
+
+def asyncTask(p: Int): Future[(Throwable \/ Option[Int])] = Future {
+  \/.fromTryCatch(Some(2 / p))
 }
 
-object ImplicitConversions {
-  implicit val intReadeable = new Readable[Int] { 
-    def read(jn: JsonNumber): Option[Int] = jn match { // либо все таки Some(jn.value)
-      case JsonNumber(number: Int) => Some(number)
-      case _ => None
+def complexRequest(p1: Int = 1, p2: Int = 0): Future[(Throwable \/ List[Option[Int]])] =
+  for {
+    r1 <- asyncTask(p1) // not throws, r1: Throwable \/ Option[Result] = \/-(Some(result))
+    r2 <- asyncTask(p2) // throws, r1: Throwable \/ Option[Result] = -\/(Throwable)
+  } yield List(r1, r2) sequenceU 
+
+def someController(...) = {
+  for { res <- complexRequest } yield res match {
+    case -\/(err) = BadRequest
+    case \/-(result) => result match {
+      case Some(res: List) => Ok(SomeComplexResponseObject.apply(res).toJson)
+      case None => NotFound
     }
   }
-
-  implicit val floatReadeable = new Readable[Float] {
-    def read(jn: JsonNumber): Option[Float] = jn match {
-      case JsonNumber(number: Float) => Some(number)
-      case _ => None
-    }
-  }
-
-  // ...
-}
-
-/** 
- * case class Person(name: String, address: Address)
- * case class Address(street: String, city: String)
- * 
- * implicit val addressWriteable = new Writable[Address] {
- *   def write(addr: Address): JsonVal = {
- *     Json.obj(
- *       street -> addr.street,
- *       city -> addr.city
- *     )
- *   }
- * }
- *
- * implicit val personWriteable = new Writable[Person] {
- *   def write(person: Person): JsonVal = {
- *     Json.obj(
- *       name -> person.name,
- *       address -> Json.toJson(person.address)
- *     )   
- *   }
- * }
- */
-trait Writable[A] {
-  def write(object: A): JsonVal
-}
-
-final class Parser extends JavaTokenParsers {
-  def object: Parser[JsonObject] = 
-    "{"~> repsep(member, ",") <~"}" ^^ 
-      (JsonObject(Map[String, JsonVal]()) + _)
-
-  def arr: Parser[JsonArray] = 
-    "["~> repsep(value, ",") <~"]" 
-
-  def member: Parser[(Sting, JsonVal)] = 
-    stringLiteral~":"~value ^^ { 
-      case name~":"~value => (name, value) 
-    }
-
-  def value: Parser[JsonVal] = ( 
-    obj 
-      | arr
-      | stringLiteral ^^ (JsonString(_))
-      | longNumber ^^ (JsonNumber(_.toLong))
-      | "null"  ^^ (JsonNull) 
-      | "true"  ^^ (JsonTrue) 
-      | "false" ^^ (JsonFalse) 
-    )
-}
-
-object Parser extends Parser {
-  def parse(string: String): JsonVal = parseAll(string) match // ...
-}
-
-implicit class Path(jo: JsonObject) {
-  def </> [T](field: String): Option[JsonVal] = jo match {
-    case JsonObject(fields) => fields(field)
-    case _ => None
-  }
-}
-
-object Json {
-  def stringify(value: JsonVal): String = value.toString()
-
-  def parse(string: String): JsonVal = Parser.parse(string)
-
-  def toJson[T](obj: T)(implicit jw: Writable[T]): JsonVal = 
-    jw.write(obj)
-
-  def fromJson[T](value: JsonVal)(implicit jr: Readable[T]): Option[T] = 
-    jr.read(value)
-
-  def obj(members: (String, JsonVal)*): JsonObject = JsonObject(members)    
-}
-
-trait JsonTransformable {
-  def as[T](implicit readable: Readable[T]): T = readable.read(this) match {
-    case Some(result) => result
-    case None => throw new Exception ...
-  }
-}
-
-sealed trait JsonVal extends JsonTransformable
-
-case object JsonNull extends JsonVal {
-  override def toString: String = "\"null\""
-}
-
-sealed trait JsonBoolean extends JsonVal
-
-case object JsonTrue extends JsonBoolean {
-  override def toString: String = "true"
-}
-case object JsonFalse extends JsonBoolean {
-  override def toString: String = "false"
-}
-
-case class JsonNumber(private[json] value: Long) extends JsonVal {
-  override def toString: String = value.toString
-}
-
-case class JsonString(private[json] value: String) extends JsonVal {
-  override def toString: String = "\"" + value + "\""
-}
-
-case class JsonArray(private[json] value: IndexedSeq[JsonVal] = Array[JsonVal]()) 
-extends JsonVal 
-{
-  // ...
-
-  override def toString: String = value.mkString(",")
-}
-
-case class JsonObject(private[json] val fields: Map[String, JsonVal]) extends JsonVal {
-  // ...  
-  override def toString: String = fields.toSeq.mkString(", ")  
-}
-
-object JsonObject {
-  def apply(members: (String, JsonVal)*): JsonObject = 
-    member foldLeft
-      (JsonObject(Map[JsonString, JsonObject]()))
-      ((init: JsonObject, current: [JsonString -> JsonObject]) =>
-        {
-          init + current
-        }
-      )
 }
