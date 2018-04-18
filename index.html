@@ -1,31 +1,115 @@
-Handling exceptions for multiple async requests with scalaz disjunction.
+-- Problem 1
+-- Find the last element of a list
+-- Example:
+--   myLast [1, 2, 3, 4] = 4
+myLast :: [a] -> a
+myLast [] = error "Empty list!"
+myLast [x] = x
+myLast (_ : xs) = myLast xs
 
-So here the sequence of operations I want to perform:
+-- Problem 2
+-- Find last but one element of a list
+-- Example:
+--   myButLust [1, 2, 3, 4] = 3
+myButLust :: [a] -> a
+myButLust [] = error "Empty list!"
+myButLust [x, _] = x
+myButLust (_ : xs) = myLast xs
 
-0. I need a several synchronouse functions which potentially may cause an exceptions (for example, perform IO).
-1. And I need them to perform async so I wrap this functions in Future.
-2. After all call them in parallel or synchronously (it's actually doesn't matter) with for-comprehension.
-3. And construct some complex result from results of given functions.
-4. But also I want to catch all erroneuse situations which might to occure.
-5. Finally, return something like scala Either or scalaz disjunction \/ (which is more preferable for me)
-in order the client code may to pattern match on it.
+-- Problem 3
+-- Find the k-th element of a list
+-- The first element in the list is 1
+-- Example
+--   elementAt [1, 2, 3, 4] 3 = 3
+elementAt :: [a] -> Int -> a
+elementAt [] _ = error "Index out of bounds"
+elementAt (x : _) 1 = x
+elementAt (_ : xs) k
+  | k < 1     = error "Index out of bounds" 
+  | otherwise = elementAt xs (k - 1)
 
-def asyncTask(p: Int): Future[(Throwable \/ Option[Int])] = Future {
-  \/.fromTryCatch(Some(2 / p))
-}
+-- Problem 4
+-- Find the number of elements of a list
+-- Example:
+--   myLength [123, 123, 323] = 3
+myLength :: [a] -> Int
+myLength list = myLengthWithAcc list 0
+  where
+    myLengthWithAcc [] n = n
+    myLengthWithAcc (_ : xs) n = myLengthWithAcc xs (n + 1)
 
-def complexRequest(p1: Int = 1, p2: Int = 0): Future[(Throwable \/ List[Option[Int]])] =
-  for {
-    r1 <- asyncTask(p1) // not throws, r1: Throwable \/ Option[Result] = \/-(Some(result))
-    r2 <- asyncTask(p2) // throws, r1: Throwable \/ Option[Result] = -\/(Throwable)
-  } yield List(r1, r2) sequenceU 
+-- Problem 5
+-- Reverse a list
+-- Example:
+--   myReverse [1, 2, 3] = [3, 2, 1]
+myReverse :: [a] -> [a]
+myReverse [] = []
+myReverse [a] = [a]
+myReverse [a, b] = [b, a]
+myReverse (x : xs) = myReverse xs ++ x
 
-def someController(...) = {
-  for { res <- complexRequest } yield res match {
-    case -\/(err) = BadRequest
-    case \/-(result) => result match {
-      case Some(res: List) => Ok(SomeComplexResponseObject.apply(res).toJson)
-      case None => NotFound
-    }
-  }
-}
+-- With tail recursion:
+myReverseTailRec :: [a] -> [a]
+myReverseTailRec (x : xs) = myReverseTailRec' xs : xs
+  where
+    myReverseTailRec' [] acc = acc
+    myReverseTailRec' (x : xs) acc = myReverseTailRec' xs (x : acc)
+
+-- Problem 6
+-- Find out whether a list is a palindrome
+-- Example:
+--   myPalindrome [1, 2, 3] = False
+myPalindrome :: (Eq a) => [a] -> Bool
+myPalindrome [] = True
+myPalindrome xs = xs == (reverse xs)
+
+-- Problem 7
+-- Flatten a nested list structure
+-- Example:
+--   myFlatten '(a (b (c d) e)) = (a b c d e)
+
+-- Because of lists in Haskell are homogeneouse, we have to define a new data type
+data NestedList a = Elem a | List [NestedList a]
+
+myFlatten :: NestedList a -> [a]
+myFlatten (Elem x) = x
+myFlatten (List []) = []
+myFlatten (List (x : xs)) = myFlatten x ++ myFlatten xs
+
+-- With tail recursion
+myFlattentailRec :: NestedList a -> [a]
+myFlattentailRec a = myFlattentailRec' a []
+  where
+    myFlattentailRec' (List []) acc = acc
+    myFlattentailRec' (Elem x) acc = x : acc
+    myFlattentailRec' (List (x : xs)) acc = myFlattentailRec' $ x myFlattentailRec' $ List xs acc
+
+-- Problem 8
+-- Eliminate consecutive duplicates of list elements
+-- Example:
+--   myCompress '(a a a a b c c a a d e e e e)
+
+myCompress :: (Eq a) => [a] -> [a]
+myCompress [] = error "Empty list!"
+myCompress [a] = a
+myCompress (x : xs@(y : _))
+  | x == y = myCompress xs
+  | otherwise = x : myCompress xs
+
+-- Problem 9
+-- Pack consecutive duplicates of list elements into sublists. 
+-- If a list contains repeated elements they should be placed in separate sublists
+-- Example:
+--   myPack [a a a a b c c a a d e e e e] = [[A A A A] [B] [C C] [A A] [D] [E E E E]]
+myPack :: (Eq a) => [a] -> [[a]]
+myPack = foldr func []
+  where func x []     = [[x]]
+        func x (y:xs) =
+             if x == (head y) then ((x:y):xs) else ([x]:y:xs)
+
+-- Problem 10
+-- Implement run-length encoding of a list
+-- Example:
+--   myEncode [a a a a b c c a a d e e e e] = [(4 A) (1 B) (2 C) (2 A) (1 D)(4 E)]
+myEncode :: (Eq a) => [a] -> [(Int, a)]
+myEncode = map (\x -> (length x, head x))
