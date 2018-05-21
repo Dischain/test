@@ -1,113 +1,229 @@
-## CLI usage
+Public Function CreateComplexField(cell As Range, Optional l As Integer, Optional parent As ComplexField) As ComplexField
+  Dim cf_obj As ComplexField
+  Set cf_obj = New ComplexField
+  
+  cf_obj.init c:=cell, level:=l, parent:=parent
+  
+  Set CreateComplexField = cf_obj
+End Function
 
-In order to run [node-static-server] from console, use command with next
-syntax:
+Private pName As String
+Private pParent As ComplexField
+Private pCell As Range
+Private pNumChildren As Long
+Private pChildren() As ComplexField
+Private pComplexityLevel As Integer
+Private pPath As String
 
-nss [path_to_config] | [path_to_root]
+Public Sub init(c As Range, Optional level As Integer, Optional parent As ComplexField)
+  pName = c.value
+  pPath = c.value
+  pNumChildren = 0
+  pComplexityLevel = level
+  
+  Set pCell = c
+  Set parent = parent
+  
+  Me.buildSubFields level:=pComplexityLevel, initial:=Me
+End Sub
 
-[path_to_config] - is the path to your `config.js` file, which determines
-same options, as you may provide to configure server from JavaScript code.
+Public Sub addChild(child As ComplexField)
+  ReDim Preserve pChildren(pNumChildren)
+  Set pChildren(pNumChildren) = child
+  
+  pNumChildren = pNumChildren + 1
+  
+  child.setParent p:=Me
+End Sub
 
-// congig.js
+Public Function valueAt(row As Long) As Range
+  Dim letter As String
+  letter = Split(Cells(1, pCell.Column).address, "$")(1)
+  
+  Set valueAt = Range(letter & row)
+End Function
 
-module.exports = {
-	root: './root',
-	cache: true,
-	gzip: true,
-	port: 3000
-}
+Public Property Get children() As Variant
+    children = pChildren
+End Property
 
-[path-to-root] - path to your root folder, which static server should serve
+Public Property Get name() As String
+    name = pName
+End Property
 
-Simple example:
+Public Property Get address() As String
+    address = pCell.address
+End Property
 
-```
-nss ../myconf.js
-```
+Public Property Get parent() As ComplexField
+  Set parent = pParent
+End Property
 
-In this case, you provide all nesessary data for server in `./myconf.js` file.
-If no `root` field specified, the default root path should used (`./`).
+Public Property Get path() As String
+  path = pPath
+End Property
 
-```
-nss ./public
-```
+Public Sub setParent(p As ComplexField)
+  Set pParent = p
+  pPath = p.path & "/" & pPath
+End Sub
 
-In this case, you provide only the path to your public directory which you want
-[node-static-server] serve. Default server configurations should be applied.
+Public Property Get numChildren() As Long
+    numChildren = pNumChildren
+End Property
 
-```
-nss
-```
+Public Function hasChildren() As Boolean
+  hasChildren = pNumChildren <> 0
+End Function
 
-Here [node-static-server] should run static server fully with the default configs.
+Public Sub buildSubFields(level As Integer, initial As ComplexField)
+  If level > 0 Then
+    initial.combineSubFields init:=initial
+    If initial.numChildren <> 0 Then
+      For i = 0 To UBound(initial.children)
+        initial.children(i).buildSubFields (level - 1), (initial.children(i))
+      Next
+    End If
+  End If
+End Sub
 
-'use strict';
+Public Sub combineSubFields(init As ComplexField)
+  subCols = combineSubCols(init.address)
+  
+  For i = 0 To UBound(subCols)
+    Dim subCol As ComplexField
+    Set subCol = subCols(i)
+    init.addChild subCol
+  Next i
+End Sub
 
-const fs = require('fs');
+　
+/-----------------------------------------------------------------------------/
 
-function Server(opts) { this._opts = opts; }
-Server.prototype.start = function() { console.log(this._opts); };
+Public Function CreatePrimitiveRow(cl As Range, fr As Range, fcl As Integer) As PrimitiveRow
+  Dim pr_obj As PrimitiveRow
+  Set pr_obj = New PrimitiveRow
+  
+  pr_obj.init cell:=cl, fieldsRange:=fr, fieldsComplexityLevel:=(fcl)
+  
+  Set CreatePrimitiveRow = pr_obj
+End Function
 
-function createServer(opts) { new Server(opts).start(); }
+　
+Private pName As String
+Private pCell As Range
+Private pFields() As ComplexField
+Private pNumFields As Long
 
-// @returns false if no errors, true if contains errors
-function checkErrors(args, output) {
-	if (args.length === 1 && !fs.existsSync(args[0])) {
-		output('nss: no such file or directory, ' + args[0]);
+Public Sub init(cell As Range, fieldsRange As Range, fieldsComplexityLevel As String)
+  pName = cell.value
+  pNumFields = 0
+  
+  Set pCell = cell
+  
+  Call addFieldsAsRange(fieldsRange, fieldsComplexityLevel)
+End Sub
 
-		return true;
-	} else if (args.length >= 2) {
-		output('nss: wrong arguments\n' + getHelpMsg());
+Public Sub addFieldsAsRange(fieldsRange As Range, fieldsComplexityLevel As String)
+  For Each cell In fieldsRange
+    If cell.value <> "" Then
+      Dim cf As ComplexField
+      Set cf = ComplexFieldFactory.CreateComplexField(Range(cell.address), (fieldsComplexityLevel))
+            
+      ReDim Preserve pFields(pNumFields)
+      Set pFields(pNumFields) = cf
+      pNumFields = pNumFields + 1
+    End If
+  Next
+End Sub
 
-		return true;
-	} else {
-		return false;	
-	}
-}
+Public Sub addFields(fields() As ComplexField)
+  For Each field In fields
+    pNumFields = pNumFields + 1
+    ReDim Preserve pFields(pNumFields)
+    Set pFields(pNumFields) = field
+  Next
+End Sub
 
-function getOpts(path) {
-	let opts = {};
+' In case of match, should return non-empty string
+' Otherwise, returns ""
+Public Function getVal(fieldName As String) As String
+  For i = 1 To pNumFields
+    If pFields(i).name = fieldName Then
+      getVal = pFields(i).valueAt(pCell.row)
+      Exit For
+    Else
+      getVal = ""
+    End If
+  Next
+End Function
 
-	if (fs.statSync(path).isDirectory()) {
-		opts.root = path ;
-	} else {
-		opts = require(path);
-	}
+Public Function getValByPath(p As String) As String
+  Debug.Print (UBound(pFields))
+  For i = 0 To pNumFields - 1
+    Debug.Print (i & ": " & pFields(i).path)
+    If pFields(i).path = p Then
+      getValByPath = pFields(i).valueAt(pCell.row)
+      Exit For
+    Else
+      getValByPath = ""
+    End If
+  Next
+End Function
 
-	return opts;
-}
+　
+/-----------------------------------------------------------------------------/
 
-function getHelpMsg() {
-	return 'nss is a simple static server based on Node.js\n'
-                        + 'Syntax:\n\n'
-                        + 'nss [path_to_config] | [path_to_root]\n\n'
-                        + '[path-to-root]   - path to your root folder, which static server should serve\n'
-                        + '[path_to_config] - is the path to your `config.js` file\n\n'
-                        + '--help - print this help and exit';
-}
+　
+Private Sub test1()
+  Dim t As Column
+  Set t = ColumnFactory.CreateColumn("test", "C", 17, 230)
+  
+  prompt = ""
+  For Each iCell In t.rows
+    If iCell.value <> "" Then
+      prompt = prompt & iCell.value & " " & iCell.address & Chr(13)
+    End If
+  Next
 
-function parseArgs(consoleArgs, output) {
-	const args = Array.prototype.slice.call(consoleArgs, 1);
+  Debug.Print (prompt)
+End Sub
 
-	if (args[0] === '--help') {
-		return output(getHelpMsg());
-	}
+Private Sub ComplexFieldTest()
+  Dim field1 As ComplexField
+  Set field1 = ComplexFieldFactory.CreateComplexField(Range("c6"))
+  Dim field2 As ComplexField
+  Set field2 = ComplexFieldFactory.CreateComplexField(Range("c8"))
+  field1.addChild child:=field2
+  Debug.Print (field1.valueAt(100))
+  Debug.Print (field1.hasChildren)
+  Debug.Print (field2.parent.name)
+End Sub
 
-	if (!checkErrors(args, output)) {
-		const opts = getOpts(args[0]);
+Private Sub primitiveRowTest()
+  Dim r1 As PrimitiveRow
+  Set r1 = PrimitiveRowFactory.CreatePrimitiveRow(Range("c20"), Range("r10:ab10"), 1)
+  r1.addFieldsAsRange fieldsRange:=Range("AC8:CL8"), fieldsComplexityLevel:=(3)
+  Debug.Print ("Íàéäåíî1: " & r1.getVal("ôåâðàëü"))
+  Debug.Print ("Íàéäåíî2: " & r1.getValByPath("ôåâðàëü/Ôåäåðàëüíûé áþäæåò/ïëàí/4"))
+  Debug.Print ("Íàéäåíî3: " & r1.getValByPath("ôåâðàëü"))
+End Sub
 
-		createServer(opts);
-	}
-}
+Private Sub combineSubColsTest()
+  Dim field As ComplexField
+  Set field = ComplexFieldFactory.CreateComplexField(Range("AC8"), 3)
 
-// Should start server in `./root` folder 
-parseArgs(['nss', './root'], console.log);
+  Debug.Print ("-----")
+  Debug.Print ("name: " & field.name)
+  Debug.Print ("field.numChildren: " & field.numChildren)
+  'field.buildSubFields level:=3, initial:=field
+  Dim l1 As ComplexField
+  Set l1 = field.children(1)
+  Dim l2 As ComplexField
+  Set l2 = l1.children(0)
+  Debug.Print (l2.children(0).parent.parent.name)
+  Debug.Print (l2.children(0).path)
+End Sub
 
-// Should start server with opts specified in `./config.js`
-parseArgs(['nss', './config.js'], console.log);
-
-// Should return `ENOENT` error 
-parseArgs(['nss', './not-exists-config.js'], console.log);
-
-// Should return wrong arguments
-parseArgs(['nss', './config.js', 'blah'], console.log);
+　
+/-----------------------------------------------------------------------------/
