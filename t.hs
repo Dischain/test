@@ -2,20 +2,20 @@ module TABLE where
 
 data Table a = Tbl [[a]] deriving Show
 
---instance Applicative Table where
---  pure [] = Table [[]]
---  pure [[]] = Table [[]]
---  pure a@((x:_):_) = Table a
+instance Applicative Table where
+  pure [] = Tbl [[]]
+  pure [[]] = Tbl [[]]
+  pure c@[[x]] = Tbl c
 
---  (<*>) :: Applicative f => f (a -> b) -> f a -> f b
---  (<*>) f (Table x) = Table $ f x
+  (<*>) :: Applicative f => f (a -> b) -> f a -> f b
+  (<*>) f (Tbl c@[[x]]) = Tbl $ f c
 
-instance Monad (Table a) where
+instance Monad Table where
   (>>=)  :: m a -> (a -> m b) -> m b
   (>>=) (Tbl c@[[x]]) f = f c
   
   return :: a -> m a
-  return x = Tbl [[x]]
+  return c@[[x]] = Tbl c
 
 fields :: Table a -> Table a
 fields (Tbl records) = Tbl [head records]
