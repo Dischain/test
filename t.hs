@@ -1,34 +1,44 @@
-module TABLE where
+module TS where
 
-data Table a = Tbl [[a]] deriving Show
+data Column a = Column [a] deriving Show
 
-instance Applicative Table where
-  pure [] = Tbl [[]]
-  pure [[]] = Tbl [[]]
-  pure c@[[x]] = Tbl c
+joinC:: [(Column a)] -> Column a
+joinC cols@((Column _):cs) = 
+  foldl (\(Column acc) (Column [a]) -> Column (a:acc)) (Column []) (reverse cols)
 
-  (<*>) :: Applicative f => f (a -> b) -> f a -> f b
-  (<*>) f (Tbl c@[[x]]) = Tbl $ f c
+instance Functor Column where
+  fmap f (Column []) = Column []
+  fmap f (Column (a:as)) = Column $ (f a) : (fmap f as)
+
+instance Applicative Column where
+  pure a = Column [a]
+
+  (Column []) <*> _ = Column []
+  (Column [f]) <*> col = fmap f col
+  
+instance Monad Column where
+  (>>=) (Column []) f = Column []
+  (>>=) (Column c) f = joinC $ fmap f c
+
+  return a = Column [a]
+
+
+---------------
+data Table a = Empty | ConsT (Column a) (Table a) deriving Show
+
+concatT :: Table a -> Table a -> Table a
+concatT Empty Empty = Empty
+concatT t1 Empty = t1
+concatT Empty t2 = t2
+concatT (ConsT a as) bs = ConsT a (concatT as bs)
+
+instance Functor Table where
+  fmap f Empty = Empty
+  fmap f (ConsT c cs) = ConsT (fmap f c) (fmap f cs)
 
 instance Monad Table where
-  (>>=)  :: m a -> (a -> m b) -> m b
-  (>>=) (Tbl c@[[x]]) f = f c
-  
-  return :: a -> m a
-  return c@[[x]] = Tbl c
-
-fields :: Table a -> Table a
-fields (Tbl records) = Tbl [head records]
-
---------------------------------------------------------
-iterateM :: Monad m => Int -> (a -> m a) -> a -> m a
-iterateM 0 _ a = return a
-iterateM n f a = f a >>= iterateM (n - 1) f
-
--- iterateM_ 2 (\x -> Just $  x - 1) (Just 10)
-iterateM_ :: Monad m => Int -> (a -> m a) -> m a -> m a
-iterateM_ 0 _ a = a
-iterateM_ n f a = (a >>= f) >>= (\x -> iterateM_ (n - 1) f (return x))
-
---innerJoin :: Table -> Table -> Key
---innerJoin t1 t2 k = t1 <$> t2 $ \fk -> filter k `eq` fk
+  (>>=) Empty f = Empty
+  (>>=) (ConsT col cols) f = concatT (Table ((>>=) col f)) ((>>=) cols f)
+    
+  return a = ConsT (Column [a]) Empty
+  return _ = Empty
