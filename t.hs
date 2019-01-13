@@ -47,10 +47,10 @@ instance Functor Table where
 instance Applicative Table where
   pure a = ConsT (pure a) Empty
 
-  t@(ConsT c cs) <*> Empty = t
-  Empty <*> t@(ConsT c cs) = t
+  Empty <*> _ = Empty
+  (ConsT fs fss) <*> t@(ConsT c Empty) = ConsT (fs <*> c) Empty
   (ConsT fs fss) <*> (ConsT bs bss) =
-    ConsT (fs <*> bs) `concatT` (fss <*> bss)
+    (ConsT (fs <*> bs) Empty) `concatT` (fss <*> bss)
 
 instance Monad Table where
   (>>=) Empty f = Empty
