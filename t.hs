@@ -1,7 +1,5 @@
 module TS where
 
-module T2 where
-
 data Column a = Column [a] deriving Show
 
 joinC :: [(Column a)] -> Column a
@@ -38,13 +36,28 @@ concatT t1 Empty = t1
 concatT Empty t2 = t2
 concatT (ConsT a as) bs = ConsT a (concatT as bs)
 
+joinT :: [Table a] -> Table a
+joinT tbls@((ConsT c cs) : ds) =
+    foldl (\acc t-> concatT t acc) Empty (reverse tbls)
+
 instance Functor Table where
   fmap f Empty = Empty
   fmap f (ConsT c cs) = ConsT (fmap f c) (fmap f cs)
 
+instance Applicative Table where
+  pure a = ConsT (pure a) Empty
+
+  t@(ConsT c cs) <*> Empty = t
+  Empty <*> t@(ConsT c cs) = t
+  (ConsT fs fss) <*> (ConsT bs bss) =
+    ConsT (fs <*> bs) `concatT` (fss <*> bss)
+
 instance Monad Table where
   (>>=) Empty f = Empty
-  (>>=) (ConsT col cols) f = concatT (Table ((>>=) col f)) ((>>=) cols f)
-    
+  (>>=) (ConsT col Empty) f = case (fmap f col) of 
+    Column tbls@(t:ts) -> joinT tbls
+    Column [] -> Empty
+  (>>=) (ConsT col cols) f  = concatT ((ConsT col Empty) >>= f) (cols >>= f)
+
   return a = ConsT (Column [a]) Empty
-  return _ = Empty
+  --return _ = Empty
