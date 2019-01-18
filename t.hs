@@ -1,34 +1,34 @@
 module TS where
 
-data Column a = Column [a] deriving Show
+data Row a = Row [a] deriving Show
 
-joinC :: [(Column a)] -> Column a
-joinC cols@((Column _):cs) = 
-  foldl (\(Column acc) (Column [a]) -> Column (a:acc)) (Column []) (reverse cols)
+joinC :: [(Row a)] -> Row a
+joinC cols@((Row _):cs) = 
+  foldl (\(Row acc) (Row [a]) -> Row (a:acc)) (Row []) (reverse cols)
 
-concatC :: Column a -> Column a -> Column a
-concatC (Column a) (Column b) = Column (a ++ b)
+concatC :: Row a -> Row a -> Row a
+concatC (Row a) (Row b) = Row (a ++ b)
 
-instance Functor Column where
-  fmap f (Column []) = Column []
-  fmap f (Column (a:as)) = Column $ (f a) : (fmap f as)
+instance Functor Row where
+  fmap f (Row []) = Row []
+  fmap f (Row (a:as)) = Row $ (f a) : (fmap f as)
 
-instance Applicative Column where
-  pure a = Column [a]
+instance Applicative Row where
+  pure a = Row [a]
 
-  (Column []) <*> _ = Column []
-  (Column (f : fs)) <*> (Column [c]) = Column [f c]
-  (Column (f : fs)) <*> (Column (c : cs)) = 
-    Column [f c] `concatC` (Column fs <*> Column cs)
+  (Row []) <*> _ = Row []
+  (Row (f : fs)) <*> (Row [c]) = Row [f c]
+  (Row (f : fs)) <*> (Row (c : cs)) = 
+    Row [f c] `concatC` (Row fs <*> Row cs)
 
-instance Monad Column where
-  (>>=) (Column []) f = Column []
-  (>>=) (Column c) f = joinC $ fmap f c
+instance Monad Row where
+  (>>=) (Row []) f = Row []
+  (>>=) (Row c) f = joinC $ fmap f c
 
-  return a = Column [a]
+  return a = Row [a]
 
 ---------------
-data Table a = Empty | ConsT (Column a) (Table a) deriving Show
+data Table a = Empty | ConsT (Row a) (Table a) deriving Show
 
 concatT :: Table a -> Table a -> Table a
 concatT Empty Empty = Empty
@@ -39,6 +39,28 @@ concatT (ConsT a as) bs = ConsT a (concatT as bs)
 joinT :: [Table a] -> Table a
 joinT tbls@((ConsT c cs) : ds) =
     foldl (\acc t-> concatT t acc) Empty (reverse tbls)
+
+mkTable :: [[a]] -> Table a
+mkTable t@(r@(c : cs) : rs) = 
+  (foldl (\acc r -> ConsT r acc) Empty) (reverse $ map (\r -> Row r) t)
+mkTable [[]] = Empty
+
+headTbl :: Table a -> Table a
+headTbl (ConsT r _) = ConsT r Empty
+headTbl Empty = Empty
+
+tailTbl :: Table a -> Table a
+tailTbl (ConsT h t@(ConsT _ _)) = t
+tailTbl Empty = Empty
+
+ithRow :: Int -> Table a -> Maybe (Table a)
+ithRow i (ConsT r t)
+  | i < 0  = Nothing
+  | i == 0 = Just $ ConsT r Empty
+  | i > 0 = case t of (ConsT nr _) -> ithRow (i - 1) t
+                      Empty -> Nothing
+
+ithRow i Empty = Nothing
 
 instance Functor Table where
   fmap f Empty = Empty
@@ -55,9 +77,10 @@ instance Applicative Table where
 instance Monad Table where
   (>>=) Empty f = Empty
   (>>=) (ConsT col Empty) f = case (fmap f col) of 
-    Column tbls@(t:ts) -> joinT tbls
-    Column [] -> Empty
+    Row tbls@(t:ts) -> joinT tbls
+    Row [] -> Empty
   (>>=) (ConsT col cols) f  = concatT ((ConsT col Empty) >>= f) (cols >>= f)
 
-  return a = ConsT (Column [a]) Empty
-  --return _ = Empty
+  return a = ConsT (Row [a]) Empty
+--return _ = Empty
+
