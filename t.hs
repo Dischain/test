@@ -18,6 +18,11 @@ filterR f (Row r) = Row $ filter f r
 ith :: Row a -> Int -> a
 ith (Row r) i = r !! i
 
+eraseIth :: Int -> Row a -> Row a
+eraseIth i (Row (a : as)) 
+  | i == 0 = Row as
+  | otherwise = eraseIth (i - 1) (Row as)
+
 instance Functor Row where
   fmap f (Row []) = Row []
   fmap f (Row (a:as)) = Row $ (f a) : (fmap f as)
@@ -45,6 +50,7 @@ appendT t1 Empty = t1
 appendT Empty t2 = t2
 appendT (ConsT a as) bs = ConsT a (appendT as bs)
 
+-- Concatting table horizontally
 concatT :: Table a -> Table a -> Table a
 concatT Empty Empty = Empty
 concatT t1 Empty = t1
@@ -105,12 +111,52 @@ ithCol i t@(ConsT r rs)
   | otherwise = Just $ modifyRows (\r -> Row [(r `ith` i)]) t
 ithCol i Empty = Nothing
 
-select :: Int -> (a -> Bool) -> Table a -> Maybe (Table a)
-select colNum f t = 
-  let res = filterRows (\r -> f (r `ith` colNum)) t
-  in case res of
-    Empty -> Nothing
-    _ -> Just res
+select :: Int -> (a -> Bool) -> Table a -> Table a
+select colNum f t = filterRows (\r -> f (r `ith` colNum)) t
+
+selectOr :: Int -> (a -> Bool) -> Int -> (a -> Bool) -> Table a -> Table a
+selectOr c1 f1 c2 f2 t = filterRows (\r -> f1 (r `ith` c1) || f2 (r `ith` c2)) t
+
+innerJoin :: Eq a => Int -> Table a -> Int -> Table a -> Table a
+innerJoin _ Empty _ _ = Empty
+innerJoin _ _ _ Empty = Empty
+innerJoin c1 t1@(ConsT a as) c2 t2 =
+  eraseEmptyRows $ ConsT (joinOne c1 a c2 t2) (innerJoin c1 as c2 t2)
+  where
+    joinOne :: Eq a => Int -> Row a -> Int -> Table a -> Row a
+    joinOne c1 r c2 Empty = Row []
+    joinOne c1 r c2 (ConsT b bs) 
+      | r `ith` c1 == b `ith` c2 = r `concatR` (eraseIth c2 b)
+      | otherwise = joinOne c1 r c2 bs
+
+leftJoin :: Eq a => Int -> Table a -> Int -> Table a -> Table a
+leftJoin _ Empty _ _ = Empty
+leftJoin _ _ _ Empty = Empty
+leftJoin c1 t1@(ConsT a as) c2 t2 =
+  ConsT (joinOne c1 a c2 t2) (leftJoin c1 as c2 t2)
+  where
+    joinOne :: Eq a => Int -> Row a -> Int -> Table a -> Row a
+    joinOne c1 r c2 Empty = r 
+    joinOne c1 r c2 (ConsT b bs) 
+      | r `ith` c1 == b `ith` c2 = r `concatR` (eraseIth c2 b)
+      | otherwise = joinOne c1 r c2 bs
+
+rightJoin :: Eq a => Int -> Table a -> Int -> Table a -> Table a
+rightJoin _ Empty _ _ = Empty
+rightJoin _ _ _ Empty = Empty
+rightJoin c1 t1 c2 t2@(ConsT a as) =
+  ConsT (joinOne c2 a c1 t1) (rightJoin c1 t1 c2 as)
+  where
+    joinOne :: Eq a => Int -> Row a -> Int -> Table a -> Row a
+    joinOne c1 r c2 Empty = r 
+    joinOne c1 r c2 (ConsT b bs) 
+      | r `ith` c1 == b `ith` c2 = r `concatR` (eraseIth c2 b)
+      | otherwise = joinOne c1 r c2 bs
+
+eraseEmptyRows :: Table a -> Table a
+eraseEmptyRows Empty = Empty
+eraseEmptyRows (ConsT (Row []) rs) = rs
+eraseEmptyRows (ConsT r@(Row (a : as)) rs) = ConsT r (eraseEmptyRows rs)
 
 instance Functor Table where
   fmap f Empty = Empty
