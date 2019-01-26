@@ -1,181 +1,36 @@
-module TS where
+import Math.Combinatorics.Exact.Binomial --exact-combinatorics-0.2.0.8
 
-data Row a = Row [a] deriving Show
+foldR :: (b -> a -> b) -> b -> Row a -> b
+foldR f acc (Row r@(a : _)) = foldl f acc r
+foldR _ acc r@(Row []) = acc
 
-joinR :: [(Row a)] -> Row a
-joinR cols@((Row _):cs) = 
-  foldl (\(Row acc) (Row [a]) -> Row (a:acc)) (Row []) (reverse cols)
+zipWithR :: (a -> b -> c) -> Row a -> Row b -> Row c
+zipWithR f (Row r1) (Row r2) = Row (zipWith f r1 r2)
 
-concatR :: Row a -> Row a -> Row a
-concatR (Row a) (Row b) = Row (a ++ b)
+average :: (Fractional a) => Row a -> a
+average r = (foldR (\acc x -> acc + x) 0 r) / 2
 
-traverseR :: (a -> b) -> Row a -> Row b
-traverseR f (Row r) = Row $ map f r
+probabilityMassFunction :: Integral a => a -> a -> Double -> Double
+probabilityMassFunction k n p = 
+  (fromIntegral (n `choose` k)) * (p ^ k) * ((1 - p) ^ (n - k))
 
-filterR :: (a -> Bool) -> Row a -> Row a
-filterR f (Row r) = Row $ filter f r
-
-ith :: Row a -> Int -> a
-ith (Row r) i = r !! i
-
-eraseIth :: Int -> Row a -> Row a
-eraseIth i (Row (a : as)) 
-  | i == 0 = Row as
-  | otherwise = eraseIth (i - 1) (Row as)
-
-instance Functor Row where
-  fmap f (Row []) = Row []
-  fmap f (Row (a:as)) = Row $ (f a) : (fmap f as)
-
-instance Applicative Row where
-  pure a = Row [a]
-
-  (Row []) <*> _ = Row []
-  (Row (f : fs)) <*> (Row [c]) = Row [f c]
-  (Row (f : fs)) <*> (Row (c : cs)) = 
-    Row [f c] `concatR` (Row fs <*> Row cs)
-
-instance Monad Row where
-  (>>=) (Row []) f = Row []
-  (>>=) (Row c) f = joinR $ fmap f c
-
-  return a = Row [a]
-
----------------
-data Table a = Empty | ConsT (Row a) (Table a) deriving Show
-
-appendT :: Table a -> Table a -> Table a
-appendT Empty Empty = Empty
-appendT t1 Empty = t1
-appendT Empty t2 = t2
-appendT (ConsT a as) bs = ConsT a (appendT as bs)
-
--- Concatting table horizontally
-concatT :: Table a -> Table a -> Table a
-concatT Empty Empty = Empty
-concatT t1 Empty = t1
-concatT Empty t2 = t2
-concatT (ConsT a as) (ConsT b bs) = ConsT (concatR a b) (concatT as bs)
-
-joinT :: [Table a] -> Table a
-joinT tbls@((ConsT c cs) : ds) =
-    foldl (\acc t-> appendT t acc) Empty (reverse tbls)
-
-mkTable :: [[a]] -> Table a
-mkTable t@(r@(c : cs) : rs) = 
-  (foldl (\acc r -> ConsT r acc) Empty) (reverse $ map (\r -> Row r) t)
-mkTable [[]] = Empty
-
-headTbl :: Table a -> Table a
-headTbl (ConsT r _) = ConsT r Empty
-headTbl Empty = Empty
-
-tailTbl :: Table a -> Table a
-tailTbl (ConsT h t@(ConsT _ _)) = t
-tailTbl Empty = Empty
-
-ithRow :: Int -> Table a -> Maybe (Table a)
-ithRow i (ConsT r t)
-  | i < 0  = Nothing
-  | i == 0 = Just $ ConsT r Empty
-  | i > 0 = case t of (ConsT nr _) -> ithRow (i - 1) t
-                      Empty -> Nothing
-ithRow _ Empty = Nothing
-
-numRows :: Table a -> Int
-numRows Empty = 0
-numRows t@(ConsT r rs) = numRows' t 0
+standardDeviation :: (Floating a) => Row a -> a
+standardDeviation row@(Row values) = 
+  (sqrt . sum $ map (\x -> (x - mu) * (x - mu)) values) /sqrt_nm1
   where
-    numRows' (ConsT r rs) acc = numRows' rs (acc + 1)
-    numRows' Empty acc = acc
+    mu = average row
+    sqrt_nm1 = sqrt $ (genericLength values - 1)
 
-numCols :: Table a -> Int
-numCols Empty = 0
-numCols t = case headTbl t of ConsT (Row r) _ -> length r
-                              otherwise -> 0
-
--- Traverse through each row
-modifyRows :: (Row a -> Row b) -> Table a -> Table b
-modifyRows f (ConsT r rs) = ConsT (f r) (modifyRows f rs)
-modifyRows _ Empty = Empty
-
-filterRows :: (Row a -> Bool) -> Table a -> Table a
-filterRows f (ConsT r rs)
-  | f r = ConsT r (filterRows f rs)
-  | otherwise = filterRows f rs
-filterRows _ Empty = Empty
-
-ithCol :: Int -> Table a -> Maybe (Table a)
-ithCol i t@(ConsT r rs)
-  | i < 0 = Nothing
-  | otherwise = Just $ modifyRows (\r -> Row [(r `ith` i)]) t
-ithCol i Empty = Nothing
-
-select :: Int -> (a -> Bool) -> Table a -> Table a
-select colNum f t = filterRows (\r -> f (r `ith` colNum)) t
-
-selectOr :: Int -> (a -> Bool) -> Int -> (a -> Bool) -> Table a -> Table a
-selectOr c1 f1 c2 f2 t = filterRows (\r -> f1 (r `ith` c1) || f2 (r `ith` c2)) t
-
-innerJoin :: Eq a => Int -> Table a -> Int -> Table a -> Table a
-innerJoin _ Empty _ _ = Empty
-innerJoin _ _ _ Empty = Empty
-innerJoin c1 t1@(ConsT a as) c2 t2 =
-  eraseEmptyRows $ ConsT (joinOne c1 a c2 t2) (innerJoin c1 as c2 t2)
+covariance :: (Fractional a) => Row a -> Row a -> a
+covariance r1 r2 = 
+  average $ zipWithR (\xi yi -> (xi-xAvg) * (yi-yAvg)) r1 r2
   where
-    joinOne :: Eq a => Int -> Row a -> Int -> Table a -> Row a
-    joinOne c1 r c2 Empty = Row []
-    joinOne c1 r c2 (ConsT b bs) 
-      | r `ith` c1 == b `ith` c2 = r `concatR` (eraseIth c2 b)
-      | otherwise = joinOne c1 r c2 bs
+    xAvg = average r1
+    yAvg = average r2
 
-leftJoin :: Eq a => Int -> Table a -> Int -> Table a -> Table a
-leftJoin _ Empty _ _ = Empty
-leftJoin _ _ _ Empty = Empty
-leftJoin c1 t1@(ConsT a as) c2 t2 =
-  ConsT (joinOne c1 a c2 t2) (leftJoin c1 as c2 t2)
+pearsonR :: (Fractional a, Floating a) => Row a -> Row a -> a
+pearsonR r1 r2 = r
   where
-    joinOne :: Eq a => Int -> Row a -> Int -> Table a -> Row a
-    joinOne c1 r c2 Empty = r 
-    joinOne c1 r c2 (ConsT b bs) 
-      | r `ith` c1 == b `ith` c2 = r `concatR` (eraseIth c2 b)
-      | otherwise = joinOne c1 r c2 bs
-
-rightJoin :: Eq a => Int -> Table a -> Int -> Table a -> Table a
-rightJoin _ Empty _ _ = Empty
-rightJoin _ _ _ Empty = Empty
-rightJoin c1 t1 c2 t2@(ConsT a as) =
-  ConsT (joinOne c2 a c1 t1) (rightJoin c1 t1 c2 as)
-  where
-    joinOne :: Eq a => Int -> Row a -> Int -> Table a -> Row a
-    joinOne c1 r c2 Empty = r 
-    joinOne c1 r c2 (ConsT b bs) 
-      | r `ith` c1 == b `ith` c2 = r `concatR` (eraseIth c2 b)
-      | otherwise = joinOne c1 r c2 bs
-
-eraseEmptyRows :: Table a -> Table a
-eraseEmptyRows Empty = Empty
-eraseEmptyRows (ConsT (Row []) rs) = rs
-eraseEmptyRows (ConsT r@(Row (a : as)) rs) = ConsT r (eraseEmptyRows rs)
-
-instance Functor Table where
-  fmap f Empty = Empty
-  fmap f (ConsT c cs) = ConsT (fmap f c) (fmap f cs)
-
-instance Applicative Table where
-  pure a = ConsT (pure a) Empty
-
-  Empty <*> _ = Empty
-  (ConsT fs fss) <*> t@(ConsT c Empty) = ConsT (fs <*> c) Empty
-  (ConsT fs fss) <*> (ConsT bs bss) =
-    (ConsT (fs <*> bs) Empty) `appendT` (fss <*> bss)
-
-instance Monad Table where
-  (>>=) Empty f = Empty
-  (>>=) (ConsT col Empty) f = case (fmap f col) of 
-    Row tbls@(t:ts) -> joinT tbls
-    Row [] -> Empty
-  (>>=) (ConsT col cols) f  = appendT ((ConsT col Empty) >>= f) (cols >>= f)
-
-  return a = ConsT (Row [a]) Empty
---return _ = Empty
+    r1Stdev = standardDeviation r1
+    r2Stdev = standardDeviation r2
+    r = covariance r1 r2 / (r1Stdev * r2Stdev)
